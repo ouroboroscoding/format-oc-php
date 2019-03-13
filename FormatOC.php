@@ -17,8 +17,8 @@ namespace FormatOC;
  * Holds regexes to match special hash elements
  */
 $_specialSyntax = '[a-z0-9_-]+';
-$_specialName = '/^' . _specialSyntax . '$/';
-$_specialKey = '/^__' . _specialSyntax . '__$/';
+$_specialName = '/^' . $_specialSyntax . '$/';
+$_specialKey = '/^__' . $_specialSyntax . '__$/';
 $_specialSet = '__%s__';
 /**#@-*/
 
@@ -52,7 +52,7 @@ $_typeToRegex = array(
  *
  * A private function to figure out the child node type
  *
- * @name _child
+ * @name __child
  * @param array $details			An array describing a data point
  * @return _NodeInterface
  */
@@ -97,7 +97,7 @@ function _child($details) {
 
 			// Else it's most likely a parent
 			else {
-				return Parent($details)
+				return Parent($details);
 			}
 		}
 	}
@@ -111,7 +111,47 @@ function _child($details) {
 
 	// Else throw an error
 	else {
-		throw InvalidArgumentException('details');
+		throw Exception('details');
+	}
+}
+
+/**
+ * Compare IPs
+ *
+ * Compares two IPs and returns a status based on which is greater
+ * If first is less than second: -1
+ * If first is equal to second: 0
+ * If first is greater than second: 1
+ *
+ * @name _compare_ips
+ * @param string $first				A string representing an IP address
+ * @param string $second			A string representing an IP address
+ * @return int
+ */
+function _compare_ips($first, $second) {
+
+	// If the two IPs are the same, return 0
+	if($first == $second) {
+		return 0;
+	}
+
+	// Create arrays from the split of each IP, store them as ints
+	$lFirst = array_map('intval', explode('.', $first));
+	$lSecond = array_map('intval', explode('.', $second));
+
+	// Go through each part from left to right until we find the
+	// 	difference
+	for($i = 0; $i <= 4; ++$i) {
+
+		// If the part of x is greater than the part of y
+		if($lFirst[$i] > $lSecond[$i]) {
+			return 1;
+		}
+
+		// Else if the part of x is less than the part of y
+		else if($lFirst[$i] < $lSecond[$i]) {
+			return -1;
+		}
 	}
 }
 
@@ -120,13 +160,13 @@ function _child($details) {
  *
  * All Node instances must be built off this set of methods
  */
-interface _Node {
+interface _NodeInterface {
 	public function clean($value);
-	public function fromFile($filename, $override);
+	public static function fromFile($filename, $override);
 	public function toArray();
 	public function toJSON();
 	public function className();
-	public function valid($value, $level);
+	public function valid($value, array $level);
 }
 
 /**
@@ -134,7 +174,7 @@ interface _Node {
  *
  * Represents shared functionality amongst Nodes and Parents
  */
-class _BaseNode implements _Node {
+abstract class _BaseNode implements _NodeInterface {
 
 	/**
 	 * The name of the child class
@@ -167,17 +207,12 @@ class _BaseNode implements _Node {
 	 *
 	 * @name _BaseNode
 	 * @access public
-	 * @throws InvalidArgumentException
-	 * @param array $details		Details describing the type of values allowed for the node
-	 * @param string $_class		The class of the child
+	 * @throws Exception
+	 * @param array $details			Details describing the type of values allowed for the node
+	 * @param string $_class			The class of the child
 	 * @return _BaseNode
 	 */
 	public function __construct(array $details, /*string*/ $_class) {
-
-		// If details is not an array
-		if(!is_array($details)) {
-			throw InvalidArgumentException('details in ' . $_class . ' must be an associative array');
-		}
 
 		// Init the variables used to identify the last falure in validation
 		$this->validation_failures = array();
@@ -242,8 +277,8 @@ class _BaseNode implements _Node {
 	 * @name fromFile
 	 * @access public
 	 * @static
-	 * @param string $filename		The filename to load
-	 * @param bool $override		Optional, if set, values 'override' sections will be used
+	 * @param string $filename			The filename to load
+	 * @param bool $override			Optional, if set, values 'override' sections will be used
 	 * @return _BasicNode
 	 */
 	public static function fromFile(/*string*/ $filename, /*bool*/ $override = false) {
@@ -266,28 +301,28 @@ class _BaseNode implements _Node {
 	 *
 	 * @name special
 	 * @access public
-	 * @throws InvalidArgumentException
-	 * @param string $name			The name of the value to either set or get
-	 * @param mixed $value			The value to set, must be able to convert to JSON
+	 * @throws Exception
+	 * @param string $name				The name of the value to either set or get
+	 * @param mixed $value				The value to set, must be able to convert to JSON
 	 * @return mixed | void
 	 */
 	public function special(/*string*/ $name, /*mixed*/ $value = null) {
 
 		// Check the name is a string
 		if(!is_string($name)) {
-			throw InvalidArgumentException('name must be a string');
+			throw Exception('name must be a string');
 		}
 
 		// Check the name is valid
 		if(!preg_match($_specialName, $name)) {
-			throw InvalidArgumentException('special name must match "' . _specialSyntax . '"');
+			throw Exception('special name must match "' . _specialSyntax . '"');
 		}
 
 		// If the value is not set, this is a getter
 		if($value == null) {
 
 			// Return the value or null
-			return (isset($this->_special[$name]) ? $this->_special[$name] : null;
+			return isset($this->_special[$name]) ? $this->_special[$name] : null;
 		}
 
 		// Else, this is a setter
@@ -295,7 +330,7 @@ class _BaseNode implements _Node {
 
 			// If we can't convert the value to JSON
 			if(json_encode($value) === false) {
-				throw InvalidArgumentException('value can not be encoded to JSON');
+				throw Exception('value can not be encoded to JSON');
 			}
 
 			// Save it
@@ -388,26 +423,16 @@ class ArrayNode extends _BaseNode {
 	 *
 	 * @name ArrayNode
 	 * @access public
-	 * @throws InvalidArgumentException
-	 * @param array $details		Details describing the type of values allowed for the node
+	 * @throws Exception
+	 * @param array $details			Details describing the type of values allowed for the node
 	 * @return ArrayNode
 	 */
 	public function __construct(array $details) {
 
-		// If details is not an array instance
-		if(!is_array($details)) {
-			throw InvalidArgumentException('details');
-		}
-
-		// If the array config is not found
-		if(!isset($details['__array__'])) {
-			throw InvalidArgumentException('details missing "__array__"');
-		}
-
 		// If __array__ is not an array
 		if(!is_array($details['__array__'])) {
 			$details['__array__'] = array(
-				"type": $details['__array__']
+				"type" => $details['__array__']
 			);
 		}
 
@@ -419,7 +444,7 @@ class ArrayNode extends _BaseNode {
 		// Or if the type is invalid
 		else if(!in_array($details['__array__']['type'], self::$_VALID_ARRAY)) {
 			$this->_type = 'unique';
-			fwrite(STDERR, '"' . strval($details['__array__']['type']) . '" is not a valid type for __array__, assuming "unique"')
+			fwrite(STDERR, '"' . strval($details['__array__']['type']) . '" is not a valid type for __array__, assuming "unique"');
 		}
 
 		// Else, store it
@@ -446,7 +471,7 @@ class ArrayNode extends _BaseNode {
 			$bOptional = $details['__optional__'];
 			unset($details['__optional__']);
 		}
-		else if(isset($details['__array__']['optional']) {
+		else if(isset($details['__array__']['optional'])) {
 			$bOptional = $details['__array__']['optional'];
 		}
 		else {
@@ -475,9 +500,9 @@ class ArrayNode extends _BaseNode {
 	 *
 	 * @name minmax
 	 * @access public
-	 * @throws InvalidArgumentException
-	 * @param uint $minimum			The minimum value to set
-	 * @param uint $maximum			The maximum value to set
+	 * @throws Exception
+	 * @param uint $minimum				The minimum value to set
+	 * @param uint $maximum				The maximum value to set
 	 * @return array | void
 	 */
 	public function minmax(/*uint*/ $minimum = null, /*uint*/ $maximum = null) {
@@ -503,13 +528,13 @@ class ArrayNode extends _BaseNode {
 
 				// Else, throw an error
 				else {
-					throw InvalidArgumentException('minimum')
+					throw Exception('__minimum__');
 				}
 			}
 
 			// If it's below zero
 			if($minimum < 0) {
-				throw InvalidArgumentException('minimum')
+				throw Exception('__minimum__');
 			}
 
 			// Store the minimum
@@ -532,18 +557,18 @@ class ArrayNode extends _BaseNode {
 
 				// Else, throw an error
 				else {
-					throw InvalidArgumentException('minimum');
+					throw Exception('__minimum__');
 				}
 			}
 
 			// It's below zero
 			if($maximum < 0) {
-				throw InvalidArgumentException('maximum');
+				throw Exception('__maximum__');
 			}
 
 			// If we also have a minimum and the max is somehow below it
 			if($this->_minimum && $maximum < $this->_minimum) {
-				throw InvalidArgumentException('maximum');
+				throw Exception('__maximum__');
 			}
 
 			// Store the maximum
@@ -559,11 +584,11 @@ class ArrayNode extends _BaseNode {
 	 *
 	 * @name clean
 	 * @access public
-	 * @throws InvalidArgumentException
-	 * @param array $value			The value to clean
+	 * @throws Exception
+	 * @param array $value				The value to clean
 	 * @return array
 	 */
-	public function clean(array $value) {
+	public function clean($value) {
 
 		// If the value is null and it's optional, return as is
 		if($value == null && $this->_optional) {
@@ -572,7 +597,7 @@ class ArrayNode extends _BaseNode {
 
 		// If the value is not an array
 		if(!is_array($value)) {
-			throw InvalidArgumentException('value');
+			throw Exception('value');
 		}
 
 		// Recurse and return it
@@ -622,12 +647,12 @@ class ArrayNode extends _BaseNode {
 			$aRet['__array__'] = $this->_type;
 		}
 
-		// Get the parents array, and the child nodes array, and them to the
-		//	return
-		$aRet = array_merge($aRet, parent::toArray(), $this->_node.toArray());
-
-		// Return
-		return $aRet;
+		// Add the parents and child array data and return
+		return array_merge(
+			$aRet,
+			parent::toArray(),
+			$this->_node.toArray()
+		);
 	}
 
 	/**
@@ -637,20 +662,21 @@ class ArrayNode extends _BaseNode {
 	 *
 	 * @name valid
 	 * @access public
-	 * @param array $value			The value to validate
+	 * @param array $value				The value to validate
 	 * @return bool
 	 */
-	public function valid(array $value, array level = array()) {
+	public function valid($value, array $level = array()) {
 
 		// Reset validation failures
-		$this->validation_failures = []
+		$this->validation_failures = array();
 
 		// If the value is null and it's optional, we're good
-		if $value is None and $this->_optional:
+		if($value == null && $this->_optional) {
 			return true;
+		}
 
 		// If the value isn't a list
-		if(!is_array($value, list)) {
+		if(!is_array($value)) {
 			$this->validation_failures[] = array(implode('.', $level), strval($value));
 			return false;
 		}
@@ -684,11 +710,11 @@ class ArrayNode extends _BaseNode {
 				if(($iIndex = array_search($value[$i], $aItems)) === false) {
 					$this->validation_failures[] = array(implode('.', $lLevel), 'duplicate of ' . implode('.', $level) . '[' . $iIndex . ']');
 					$bRet = false;
-					continue
+					continue;
 				}
 
 				// Add the value to the array and continue
-				lItems.append($value[i])
+				$lItems[] = $value[i];
 			}
 		}
 
@@ -707,12 +733,893 @@ class ArrayNode extends _BaseNode {
 
 			// If we have too many
 			if(count($value) > $this->_maximum) {
-				$this->validation_failures[] array(implode('.', $level), 'exceeds maximum');
+				$this->validation_failures[] = array(implode('.', $level), 'exceeds maximum');
 				$bRet = false;
 			}
 		}
 
 		// Return whatever the result was
 		return $bRet;
+	}
+}
+
+/**
+ * HashNode class
+ *
+ * Handles objects similar to parents except where the keys are dynamic instead
+ * of static, and the values are all of one node definition
+ *
+ * @extends _BaseNode
+ */
+class HashNode extends _BaseNode {
+
+	/**
+	 * Constructor
+	 *
+	 * Initialises the instance
+	 *
+	 * @name HashNode
+	 * @access public
+	 * @throws Exception
+	 * @param array $details			Details describing the type of values allowed for the node
+	 * @return HashNode
+	 */
+	public function __construct(array $details) {
+
+		// If the hash config is not found
+		if(!isset($details['__hash__'])) {
+			throw Exception('__hash__ not in details');
+		}
+
+		// If there's an optional flag somewhere in the mix
+		if(isset($details['__optional__'])) {
+			$bOptional = $details['__optional__'];
+			unset($details['__optional__']);
+		}
+		else {
+			$bOptional = null;
+		}
+
+		// If the hash is simply set to True, make it a string with no
+		//	requirements
+		if($details['__hash__'] === true) {
+			$details['__hash__'] = array('__type__' => 'string');
+		}
+
+		// Store the key using the hash value
+		$this->_key = new Node($details['__hash__']);
+
+		// Remove it from details
+		unset($details['__hash__']);
+
+		// Store the child
+		$this->_node = _child($details);
+
+		// If we had an optional flag, add it for the parent constructor
+		if($bOptional) {
+			$details['__optional__'] = $bOptional;
+		}
+
+		// Call the parent constructor
+		parent::__construct($details, 'HashNode');
+	}
+
+	/**
+	 * Clean
+	 *
+	 * Makes sure both the key and value are properly stored in their correct
+	 * representation
+	 *
+	 * @name clean
+	 * @access public
+	 * @throws Exception
+	 * @param array $value				The value to clean
+	 * @return array
+	 */
+	public function clean($value) {
+
+		// If the value is null and it's optional, return as is
+		if($value == null && $this->_optional) {
+			return null;
+		}
+
+		// If the value is not a dict
+		if(!is_array($value)) {
+			throw Exception('value');
+		}
+
+		// Recurse and return it
+		$aRet = array();
+		foreach($value as $k => $v) {
+			$aRet[$this->_key.clean($k)] = $this->_node.clean($v);
+		}
+		return $aRet;
+	}
+
+	/**
+	 * To Array
+	 *
+	 * Returns the Hashed Node as a dictionary in the same format as is used in
+	 * constructing it
+	 *
+	 * @name toArray
+	 * @access public
+	 * @return array
+	 */
+	public function toArray() {
+
+		// Merge the key and node then return
+		return array_merge(
+			array('__hash__' => $this->_key.toArray()),
+			parent::toArray(),
+			$this->_node.toArray()
+		);
+	}
+
+	/**
+	 * Valid
+	 *
+	 * Checks if a value is valid based on the instance's values
+	 *
+	 * @name valid
+	 * @access public
+	 * @param array $value				The value to validate
+	 * @return bool
+	 */
+	public function valid($value, array $level = array()) {
+
+		// Reset validation failures
+		$this->validation_failures = array();
+
+		// If the value is null and it's optional, we're good
+		if($value == null && $this->_optional) {
+			return true;
+		}
+
+		// If the value isn't an array
+		if(!is_array($value)) {
+			$this->validation_failures[] = array(implode('.', level), strval($value));
+			return false;
+		}
+
+		// Init the return, assume valid
+		$bRet = true;
+
+		// Go through each key and value
+		foreach($value as $k => $v) {
+
+			// Add the field to the level
+			$lLevel = $level;
+			$lLevel[] = $k;
+
+			// If the key isn't valid
+			if(!$this->_key.valid(k)) {
+				$this->validation_failures[] = array(implode('.', lLevel), 'invalid key: ' + strval($k));
+				$bRet = false;
+				continue;
+			}
+
+			// Check the value
+			if(!$this->_node.valid($v, $lLevel)) {
+				$this->validation_failures = array_merge($this->validation_failures, $this->_node.validation_failures);
+				$bRet = false;
+				continue;
+			}
+		}
+
+		// Return whatever the result was
+		return $bRet;
+	}
+}
+
+/**
+ * Node class
+ *
+ * Represents a single node of data, an immutable type like an int or a string
+ *
+ * @extends _BaseNode
+ */
+class Node extends _BaseNode {
+
+	/**#@+
+	 * Min/Max values
+	 * @var uint
+	 */
+	protected $_maximum;
+	protected $_minimum;
+	/**#@-*/
+
+	/**
+	 * Options for the Node
+	 * @var mixed[]
+	 */
+	protected $_options;
+
+	/**
+	 * Regular expresssion to validate a string
+	 * @var string
+	 */
+	protected $_regex;
+
+	/**
+	 * The type of node
+	 * @var string
+	 */
+	protected $_type;
+
+	/**
+	 * Valid node types
+	 * @var string[]
+	 */
+	protected static $_VALID_TYPES = array(
+		'any', 'base64', 'bool', 'date', 'datetime', 'decimal',
+		'float', 'int', 'ip', 'json', 'md5', 'price', 'string',
+		'time', 'timestamp', 'uint', 'uuid');
+
+	/**
+	 * Constructor
+	 *
+	 * @name Node
+	 * @access public
+	 * @throws Exception
+	 * @param array|string $details		Details describing the type of value allowed for the node
+	 * @return Node
+	 */
+	public function __construct($details) {
+
+		// If we got a string
+		if(is_string($details)) {
+			$details = array('__type__' => $details);
+		}
+
+		// If details is not an array
+		else if(!is_array($details)) {
+			throw Exception('details');
+		}
+
+		// If the type is not found or is invalid
+		if(!isset($details['__type__']) || !in_array($details['__type__'], $this->_VALID_TYPES)) {
+			throw Exception('__type__ not in details');
+		}
+
+		// Store the type and remove it from the details
+		$this->_type = $details['__type__'];
+		unset($details['__type__']);
+
+		// Init the value types
+		$this->_regex = null;
+		$this->_options = null;
+		$this->_minimum = null;
+		$this->_maximum = null;
+
+		// If there's a regex string available
+		if(isset($details['__regex__'])) {
+			$this->regex($details['__regex__']);
+			unset($details['__regex__']);
+		}
+
+		// Else if there's a list of options
+		else if(isset($details['__options__'])) {
+			$this->options($details['__options__']);
+			unset($details['__options__']);
+		}
+
+		// Else
+		else {
+
+			// If there's a min or max
+			$bMin = isset($details['__minimum__']);
+			$bMax = isset($details['__maximum__']);
+
+			if($bMin || $bMax) {
+				$this->minmax(
+					$bMin ? $details['__minimum__'] : null,
+					$bMax ? $details['__maximum__'] : null
+				);
+			}
+
+			if($bMin) unset($details['__minimum__']);
+			if($bMax) unset($details['__maximum__']);
+		}
+
+		// Call the parent constructor
+		parent::__construct($details, 'Node');
+	}
+
+	/**
+	 * Clean
+	 *
+	 * Cleans and returns the new value
+	 *
+	 * @name clean
+	 * @access public
+	 * @param mixed $value				The value to clean
+	 * @return mixed
+	 */
+	public function clean($value) {
+
+		// If the value is null and it's optional, return as is
+		if(value == null && $this->_optional) {
+			return null;
+		}
+
+		// If it's an ANY, there is no reasonable expectation that we know what
+		//	the value should be, so we return it as is
+		if($this->_type == 'any') {
+			//pass
+		}
+
+		// Else if it's a basic string type
+		else if(in_array($this->_type, array('base64', 'ip', 'string', 'uuid'))) {
+
+			// And not already a string
+			if(!is_string($value)) {
+				$value = strval($value);
+			}
+		}
+
+		// Else if it's a BOOL just check if the value flags as positive
+		else if($this->_type == 'bool') {
+
+			// If it's specifically a string, it needs to match a specific
+			//	pattern to be true
+			if(is_string($value)) {
+				$value = in_array($value, array('true', 'True', 'TRUE', 't', 'T', 'yes', 'Yes', 'YES', 'y', 'Y', 'x', '1'));
+			}
+
+			// Else
+			else {
+				$value = $value ? true : False;
+			}
+		}
+
+		// Else if it's a date type
+		else if($this->_type == 'date') {
+
+			// If it's a PHP type, call format on it
+			if($value instanceof DateTime) {
+				$value = $value.format('Y-m-d');
+			}
+
+			// Else if it's already a string
+			else if(is_string($value)) {
+				//pass
+			}
+
+			// Else convert it to a string
+			else {
+				$value = strval($value);
+			}
+		}
+
+		// Else if it's a datetime type
+		else if($this->_type == 'datetime') {
+
+			// If it's a PHP type, call format on it
+			if($value instanceof DateTime) {
+				$value = $value.format('Y-m-d H:i:s');
+			}
+
+			// Else if it's already a string
+			else if(is_string($value)) {
+				//pass
+			}
+
+			// Else convert it to a string
+			else {
+				$value = strval($value);
+			}
+		}
+
+		// Else if it's a decimal
+		else if($this->_type == 'decimal') {
+
+			// If it's not a string
+			if(!is_string($value)) {
+				$value = strval($value);
+			}
+		}
+
+		// Else if it's a float
+		else if($this->_type == 'float') {
+
+			// If it's not a float
+			if(!is_float($value)) {
+				$value = floatval($value);
+			}
+		}
+
+		// Else if it's an int type
+		else if(in_array($this->_type, array('int', 'timestamp', 'uint'))) {
+
+			// If the value is a string
+			if(is_string($value)) {
+
+				// If it starts with 0
+				if($value[0] == '0' && strlen($value) > 1) {
+
+					// If it's followed by X or x, it's hex
+					if(in_array($value[1], array('x', 'X')) && strlen($value) > 2) {
+						$value = intval($value, 16);
+					}
+
+					// Else it's octal
+					else {
+						$value = intval($value, 8);
+					}
+				}
+
+				// Else it's base 10
+				else {
+					$value = intval($value, 10);
+				}
+			}
+
+			// Else if it's not an int already
+			else if(!is_int($value)) {
+				$value = intval($value);
+			}
+		}
+
+		// Else if it's a JSON type
+		else if($this->_type == 'json') {
+
+			// If it's already a string
+			if(is_string($value)) {
+				//pass
+			}
+
+			// Else, encode it
+			else {
+				$value = json_encode($value);
+			}
+		}
+
+		// Else if it's an md5 type
+		else if($this->_type == 'md5') {
+
+			// If it's a string
+			if(is_string($value)) {
+				//pass
+			}
+
+			// Else, try to convert it to a string
+			else {
+				$value = strval($value);
+			}
+		}
+
+		// Else if it's a price type
+		else if($this->_type == 'price') {
+
+			// If it's not a string
+			if(!is_string($value)) {
+				$value = number_format((float)$value, 2, '.', '');
+			}
+		}
+
+		// Else if it's a time type
+		else if($this->_type == 'time') {
+
+			// If it's a PHP type, use format on it
+			if($value instanceof DateTime) {
+				$value = $value.format('H:i:s');
+			}
+
+			// Else if it's already a string
+			else if(is_string($value)) {
+				//pass
+			}
+
+			// Else convert it to a string
+			else {
+				$value = strval($value);
+			}
+		}
+
+		// Else we probably forgot to add a new type
+		else {
+			throw Exception($this->_type . ' has not been added to .clean()');
+		}
+
+		// Return the cleaned value
+		return $value;
+	}
+
+	/**
+	 * Min/Max
+	 *
+	 * Sets or gets the minimum and/or maximum values for the Node. For
+	 * getting, returns array('minimum' => mixed, 'maximum' => mixed)
+	 *
+	 * @name minmax
+	 * @access public
+	 * @throws Exception
+	 * @param mixed $minimum			The minimum value
+	 * @param mixed $maxium				The maximum value
+	 * @return array | void
+	 */
+	public function minmax($minimum = null, $maxium = null) {
+
+		// If neither min or max is set, this is a getter
+		if($minimum == null && $maximum == null) {
+			return array('minimum' => $this->_minimum, 'maximum' => $this->_maximum);
+		}
+
+		// If the minimum is set
+		if($minimum != null) {
+
+			// If the current type is a date, datetime, ip, or time
+			if(in_array($this->_type, array('date', 'datetime', 'ip', 'time'))) {
+
+				// Make sure the value is valid for the type
+				if(!is_string($minimum) ||
+					!preg_match($_typeToRegex[$this->_type], $minimum)) {
+					throw Exception('__minimum__');
+				}
+			}
+
+			// Else if the type is an int (unsigned, timestamp), or a string in
+			// 	which the min/max are lengths
+			else if(in_array($this->_type, array('int', 'string', 'timestamp', 'uint'))) {
+
+				// If the value is not a valid int or long
+				if(!is_int($minimum)) {
+
+					// If it's a valid representation of an integer
+					if(is_string($minimum) &&
+						preg_match($_typeToRegex['int'], $minimum)) {
+
+						// Convert it
+						$minimum = intval($minimum, 0);
+					}
+
+					// Else, throw an error
+					else {
+						throw Exception('__minimum__');
+					}
+
+					// If the type is meant to be unsigned
+					if(in_array($this->_type, array('string', 'timestamp', 'uint'))) {
+
+						// And it's below zero
+						if($minimum < 0) {
+							throw Exception('__minimum__');
+						}
+					}
+				}
+			}
+
+			// Else if the type is decimal
+			else if($this->_type == 'decimal') {
+
+				// If it's not a string, convert it
+				if(!is_string($minimum)) {
+					$minimum = strval($minimum);
+				}
+
+				// If it doesn't fit the regex
+				if(!preg_match($_typeToRegex['decimal'], $minimum)) {
+					throw Exception('__minimum__');
+				}
+			}
+
+			// Else if the type is float
+			else if($this->_type == 'float') {
+
+				// If it's not already a float, convert it
+				if(!is_float($minimum)) {
+					$minimum = floatval($minimum);
+				}
+			}
+
+			// Else if the type is price
+			else if($this->_type == 'price') {
+
+				// If it's not a valid representation of a price
+				if(!is_string($minimum) ||
+					!preg_match($_typeToRegex['price'], $minimum)) {
+					throw Exception('__minimum__');
+				}
+			}
+
+			// Else we can't have a minimum
+			else {
+				throw Exception('can not set __minimum__ for ' . $this->_type);
+			}
+
+			// Store the minimum
+			$this->_minimum = $minimum;
+		}
+
+		// If the maximum is set
+		if($maximum != null) {
+
+			// If the current type is a date, datetime, ip, or time
+			if(in_array($this->_type, array('date', 'datetime', 'ip', 'time'))) {
+
+				// Make sure the value is valid for the type
+				if(!is_string($maximum) ||
+					!preg_match($_typeToRegex[$this->_type], $maximum)) {
+					throw Exception('__maximum__');
+				}
+			}
+
+			// Else if the type is an int (unsigned, timestamp), or a string in
+			// 	which the min/max are lengths
+			else if(in_array($this->_type, array('int', 'string', 'timestamp', 'uint'))) {
+
+				// If the value is not a valid int or long
+				if(!is_int($maximum)) {
+
+					// If it's a valid representation of an integer
+					if(!is_string($maximum) &&
+						!preg_match($_typeToRegex['int'], $maximum)) {
+
+						// Convert it
+						$maximum = intval($maximum, 0);
+					}
+
+					// Else, throw an error
+					else {
+						throw Exception('__maximum__');
+					}
+
+					// If the type is meant to be unsigned
+					if(in_array($this->_type, array('string', 'timestamp', 'uint'))) {
+
+						// And it's below zero
+						if($maximum < 0) {
+							throw Exception('__maximum__');
+						}
+					}
+				}
+			}
+
+			// Else if the type is decimal
+			else if($this->_type == 'decimal') {
+
+				// If it's not a string, convert it
+				if(!is_string($maximum)) {
+					$maximum = strval($maximum);
+				}
+
+				// If it doesn't fit the regex
+				if(!preg_match($_typeToRegex['decimal'], $maximum)) {
+					throw Exception('__maximum__');
+				}
+			}
+
+			// Else if the type is float
+			else if($this->_type == 'float') {
+
+				// If it's not already a float, convert it
+				if(!is_float($maximum)) {
+					$maximum = floatval($maximum);
+				}
+			}
+
+			// Else if the type is price
+			else if($this->_type == 'price') {
+
+				// If it's not a valid representation of a price
+				if(!is_string($maximum) ||
+					!preg_match($_typeToRegex['price'], $maximum)) {
+					throw Exception('__maximum__');
+				}
+			}
+
+			// Else we can't have a maximum
+			else {
+				throw Exception('can not set __maximum__ for ' . $this->_type);
+			}
+
+			// If we also have a minimum
+			if($this->_minimum != null) {
+
+				// If the type is an IP
+				if($this->_type == 'ip') {
+
+					// If the min is above the max, we have a problem
+					if(_compare_ips($this->_minimum, $maximum) == 1) {
+						throw Exception('__maximum__');
+					}
+				}
+
+				// Else any other data type
+				else {
+
+					// If the min is above the max, we have a problem
+					if($this->_minimum > $maximum) {
+						throw Exception('__maximum__');
+					}
+				}
+			}
+
+			// Store the maximum
+			$this->_maximum = $maximum;
+		}
+	}
+
+	/**
+	 * Options
+	 *
+	 * Sets or gets the list of acceptable values for the Node
+	 *
+	 * @name options
+	 * @access public
+	 * @throws Exception
+	 * @param array $opts				An array of valid values for the Node
+	 * @return array | void
+	 */
+	public function options($opts = null) {
+
+		// If opts aren't set, this is a getter
+		if(options == null) {
+			return $this->_options;
+		}
+
+		// If the options are not a list
+		if(!is_array($options) || !isset($options[0])) {
+			throw Exception('options');
+		}
+
+		// If the type is not one that can have options
+		if(!in_array($this->_type, array(
+				'base64', 'date', 'datetime', 'decimal', 'float',
+				'int', 'ip', 'md5', 'price', 'string', 'time',
+				'timestamp', 'uint', 'uuid'))) {
+			throw Exception('can not set __options__ for ' . $this->_type);
+		}
+
+		// Init the list of options to be saved
+		$aOpts = array();
+
+		// Go through each item and make sure it's unique and valid
+		for($i = 0; $i < count($options); ++$i) {
+
+			// Convert the value based on the type
+			// If the type is a string one that we can validate
+			if(in_array($this->_type, array('base64', 'date', 'datetime', 'ip', 'md5', 'time', 'uuid'))) {
+
+				// If the value is not a string or doesn't match its regex, throw
+				//	an error
+				if(is_string($options[$i]) ||
+					!preg_match($_typeToRegex[$this->_type], $options[$i])) {
+					throw Exception('__options__[' . $i . ']');
+				}
+			}
+
+			// Else if it's decimal
+			else if($this->_type == 'decimal') {
+
+				// If it's not a string, convert it
+				if(!is_string($options[$i])) {
+					$options[$i] = strval($options[$i]);
+				}
+
+				// If it doesn't fit the regex
+				if(!preg_match($_typeToRegex['decimal'], $options[$i])) {
+					throw Exception('__options__[' . $i . ']');
+				}
+			}
+
+			// Else if it's a float
+			else if($this->_type == 'float') {
+
+				// If it's not already a float, convert it
+				if(!is_float($options[$i])) {
+					$options[$i] = floatval($options[$i]);
+				}
+			}
+
+			// Else if it's an integer
+			else if(in_array($this->_type, array('int', 'timestamp', 'uint'))) {
+
+				// If we don't already have an int
+				if(!is_int($options[$i])) {
+
+					// And we don't have a string
+					if(!is_string($options[$i])) {
+						throw Exception('__options__[' . $i . ']');
+					}
+
+					// Convert it
+					$options[$i] = intval($options[$i], 0);
+				}
+
+				// If the type is unsigned and negative, throw an error
+				if(in_array($this->_type, array('timestamp', 'uint')) && $options[$i] < 0) {
+					throw Exception('__options__[' . $i . ']');
+				}
+			}
+
+			// Else if it's a price
+			else if($this->_type == 'price') {
+
+				// If it's not a valid representation of a price
+				if(!is_string($options[$i]) ||
+					!preg_match($_typeToRegex['price'], $options[$i])) {
+					throw Exception('__options__[' . $i . ']');
+				}
+			}
+
+			// Else if the type is a string
+			else if($this->_type == 'string') {
+
+				// If the value is not a string
+				if(!is_string($options[$i])) {
+					$options[$i] = strval($options[$i]);
+				}
+			}
+
+			// Else we have no validation for the type
+			else {
+				throw Exception('can not set __options__ for ' . $this->_type);
+			}
+
+			// If it's already in the list, throw an error
+			if(in_array($options[$i], $aOpts)) {
+				fwrite(STDERR, '__options__[' . $i . '] is a duplicate');
+			}
+
+			// Store the option
+			else {
+				$aOpts[] = $options[$i];
+			}
+		}
+
+		// Store the list of options
+		$this->_options = $aOpts;
+	}
+
+	/**
+	 * Regex
+	 *
+	 * Sets or gets the regular expression used to validate the Node
+	 *
+	 * @name regex
+	 * @access public
+	 * @throws Exception
+	 * @param string $regex				A standard regular expression string
+	 * @return string | void
+	 */
+	public function regex($regex = null) {
+
+		// If regex was not set, this is a getter
+		if($regex == null) {
+			return $this->_regex;
+		}
+
+		// If the type is not a string
+		if($this->_type != 'string') {
+			fwrite(STDERR, 'can not set __regex__ for ' . $this->_type);
+			return;
+		}
+
+		// If it's not a valid string or regex
+		if(!is_string($regex)) {
+			throw Exception('__regex__');
+		}
+
+		// Store the regex
+		$this->_regex = $regex;
+	}
+
+	/**
+	 * Type
+	 *
+	 * Returns the type of Node
+	 *
+	 * @name type
+	 * @access public
+	 * @return string
+	 */
+	public function type() {
+		return $this->_type;
+	}
+
+	public function valid($value, array $level = array()) {
+
 	}
 }
