@@ -39,10 +39,11 @@ $_typeToRegex = array(
 	'base64'	=> '/^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/',
 	'date'		=> '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/',
 	'datetime'	=> '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
+	'decimal'	=> '/^-?(?:[1-9]\d+|\d)(?:\.\d+)?$/',
 	'int'		=> '/^(?:0|[+-]?[1-9]\d*|0x[0-9a-f]+|0[0-7]+)$/',
 	'ip'		=> '/^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){2}\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])$/',
 	'md5'		=> '/^[a-fA-F0-9]{32}$/',
-	'price'		=> '/^-?(?:[1-9]\d+|\d)(?:\.\d{1,2})?$/',
+	'price'		=> '/^-?(?:[1-9]\d+|\d)(?:\.(\d{1,2}))?$/',
 	'time'		=> '/^(?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
 	'uuid'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/'
 );
@@ -97,7 +98,7 @@ function _child($details) {
 
 			// Else it's most likely a parent
 			else {
-				return Parent($details);
+				return new ParentNode($details);
 			}
 		}
 	}
@@ -162,7 +163,7 @@ function _compare_ips($first, $second) {
  */
 interface _NodeInterface {
 	public function clean($value);
-	public static function fromFile($filename, $override);
+	public static function fromFile($filename);
 	public function toArray();
 	public function toJSON();
 	public function className();
@@ -173,6 +174,8 @@ interface _NodeInterface {
  * Base Node class
  *
  * Represents shared functionality amongst Nodes and Parents
+ *
+ * @implements _NodeInterface
  */
 abstract class _BaseNode implements _NodeInterface {
 
@@ -189,14 +192,14 @@ abstract class _BaseNode implements _NodeInterface {
 	protected $_optional;
 
 	/**
-	 * List of special fields associated with the node
+	 * Associated array of special fields in the node
 	 * @var array
 	 */
 	protected $_special;
 
 	/**
-	 * @var array Holds a list of the last errors from failed valid() calls
-	 * @access public
+	 * Holds a list of the last errors from failed valid() calls
+	 * @var string[][]
 	 */
 	public $validation_failures;
 
@@ -278,10 +281,9 @@ abstract class _BaseNode implements _NodeInterface {
 	 * @access public
 	 * @static
 	 * @param string $filename			The filename to load
-	 * @param bool $override			Optional, if set, values 'override' sections will be used
 	 * @return _BasicNode
 	 */
-	public static function fromFile(/*string*/ $filename, /*bool*/ $override = false) {
+	public static function fromFile(/*string*/ $filename) {
 
 		// Get the contents of the file
 		$details = file_get_contents($filename);
@@ -460,7 +462,7 @@ class ArrayNode extends _BaseNode {
 		$bMin = isset($details['__array__']['minimum']);
 		$bMax = isset($details['__array__']['maximum']);
 		if($bMin || $bMax) {
-			this.minmax(
+			$this->minmax(
 				$bMin ? $details['__array__']['minimum'] : null,
 				$bMax ? $details['__array__']['maximum'] : null
 			);
@@ -1077,7 +1079,7 @@ class Node extends _BaseNode {
 		else if($this->_type == 'date') {
 
 			// If it's a PHP type, call format on it
-			if($value instanceof DateTime) {
+			if($value instanceof \DateTime) {
 				$value = $value.format('Y-m-d');
 			}
 
@@ -1096,7 +1098,7 @@ class Node extends _BaseNode {
 		else if($this->_type == 'datetime') {
 
 			// If it's a PHP type, call format on it
-			if($value instanceof DateTime) {
+			if($value instanceof \DateTime) {
 				$value = $value.format('Y-m-d H:i:s');
 			}
 
@@ -1202,7 +1204,7 @@ class Node extends _BaseNode {
 		else if($this->_type == 'time') {
 
 			// If it's a PHP type, use format on it
-			if($value instanceof DateTime) {
+			if($value instanceof \DateTime) {
 				$value = $value.format('H:i:s');
 			}
 
@@ -1619,7 +1621,998 @@ class Node extends _BaseNode {
 		return $this->_type;
 	}
 
+	/**
+	 * Valid
+	 *
+	 * Checks if a value is valid based on the instance's values
+	 *
+	 * @name valid
+	 * @access public
+	 * @param mixed $value				The value to validate
+	 * @return bool
+	 */
 	public function valid($value, array $level = array()) {
 
+		// Reset validation failures
+		$this->validation_failures = array();
+
+		// If the value is null and it's optional, we're good
+		if($value == null && $this->_optional) {
+			return true;
+		}
+
+		// If we are validating an ANY field, immediately return true
+		if($this->_type == 'any') {
+			//pass
+		}
+
+		// If we are validating a DATE, DATETIME, IP or TIME data point
+		else if(in_array($this->_type, array('base64', 'date', 'datetime', 'ip', 'md5', 'time', 'uuid'))) {
+
+			// If it's a date or datetime type and the value is a python type
+			if($this->_type == 'date' && $value instanceof \DateTime) {
+				$value = $value.format('Y-m-d');
+			}
+
+			else if($this->_type == 'datetime' && $value instanceof \DateTime) {
+				$value = $value.format('Y-m-d H:i:s');
+			}
+
+			// If it's a time type and the value is a python type
+			else if($this->_type == 'time' && $value instanceof \DateTime) {
+				$value = $value.format('H:i:s');
+			}
+
+			// If the value is not a string
+			else if(!is_string($value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'not a string');
+				return false;
+			}
+
+			// If there's no match
+			if(!preg_match($_typeToRegex[$this->_type], $value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'failed regex (internal)');
+				return false;
+			}
+
+			// If we are checking an IP
+			if($this->_type == 'ip') {
+
+				// If there's a min or a max
+				if($this->_minimum != null || $this->_maximum != null) {
+
+					// If the IP is greater than the maximum
+					if($this->_maximum != null && _compare_ips($value, $this->_maximum) == 1) {
+						$this->validation_failures[] = array(implode('.', $level), 'exceeds maximum');
+						return false;
+					}
+
+					// If the IP is less than the minimum
+					if($this->_minimum != null && _compare_ips($value, $this->_minimum) == -1) {
+						$this->validation_failures[] = array(implode('.', $level), 'did not meet minimum');
+						return false;
+					}
+
+					// Return OK
+					return true;
+				}
+			}
+		}
+
+		// Else if we are validating some sort of integer
+		else if(in_array($this->_type, array('int', 'timestamp', 'uint'))) {
+
+			// If the type is a bool, fail immediately
+			if(is_bool($value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'is a bool');
+				return false;
+			}
+
+			// If it's not an int
+			if(!is_int($value)) {
+
+				// And it's a valid representation of an int
+				if(is_string($value) &&
+					preg_match($_typeToRegex['int'], $value)) {
+
+					// If it starts with 0
+					if($value[0] == '0' && strlen($value) > 1) {
+
+						// If it's followed by X or x, it's hex
+						if(in_array($value[1], array('x', 'X') && strlen($value) > 2)) {
+							$value = intval($value, 16);
+						}
+
+						// Else it's octal
+						else {
+							$value = intval($value, 8);
+						}
+					}
+
+					// Else it's base 10
+					else {
+						$value = intval($value, 10);
+					}
+				}
+
+				// Else, return false
+				else {
+					$this->validation_failures[] = array(implode('.', level), 'not an integer');
+					return false;
+				}
+			}
+
+			// If it's not signed
+			if(in_array($this->_type, array('timestamp', 'uint'))) {
+
+				// If the value is below 0
+				if($value < 0) {
+					$this->validation_failures[] = array(implode('.', level), 'signed');
+					return false;
+				}
+			}
+		}
+
+		// Else if we are validating a bool
+		else if($this->_type == 'bool') {
+
+			// If it's already a bool
+			if(is_bool($value, bool)) {
+				return true;
+			}
+
+			// If it's an int or long at 0 or 1
+			if(is_int($value) && ($value == 0 || $value == 1)) {
+				return true;
+			}
+
+			// Else if it's a string
+			else if(is_string($value)) {
+
+				// If it's t, T, 1, f, F, or 0
+				if(in_array($value, array('true', 'True', 'TRUE', 't', 'T', '1', 'false', 'False', 'FALSE', 'f', 'F', '0'))) {
+					return true;
+				}
+				else {
+					$this->validation_failures[] = array(implode('.', $level), 'not a valid string representation of a bool');
+					return false;
+				}
+			}
+
+			// Else it's no valid type
+			else {
+				$this->validation_failures[] = array(implode('.', $level), 'not valid bool replacement');
+				return false;
+			}
+		}
+
+		// Else if we are validating a decimal value
+		else if($this->_type == 'decimal') {
+
+			// If the type is a bool, fail immediately
+			if(is_bool($value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'is a bool');
+				return false;
+			}
+
+			// If it's numeric, convert it to a string
+			if(is_float($value) || is_int($value)) {
+				$value = strval($value);
+			}
+
+			// Else if it's a string
+			else if(is_string($value)) {
+
+				// If the format is wrong
+				if(!preg_match($_typeToRegex['decimal'], $value)) {
+					$this->validation_failures[] = array(implode('.', $level), 'failed regex (internal)');
+					return false;
+				}
+			}
+
+			// Else we can't convert it
+			else {
+				$this->validation_failures[] = array(implode('.', $level), 'can not be converted to decimal');
+				return false;
+			}
+
+			// If there's options
+			if($this->_options) {
+
+				// Go through each one
+				foreach($this->_options as $d) {
+
+					// If they match, return OK
+					if(bccomp($value, $d) == 0) {
+						return true;
+					}
+				}
+			}
+
+			// Else if there's a min or max
+			else if($this->_minimum != null || $this->_maximum != null) {
+
+				// If there's a minimum and we don't reach it
+				if($this->_minimum != null && bccomp($value, $this->_minimum) == -1) {
+					$this->validation_failures[] = array(implode('.', $level), 'not long enough');
+					return false;
+				}
+
+				// If there's a maximum and we surpass it
+				if($this->_maximum != null && bccomp($value, $this->_maximum) == 1) {
+					$this->validation_failures[] = array(implode('.', $level), 'too long');
+					return false;
+				}
+
+				// Return OK
+				return true;
+			}
+		}
+
+		// Else if we are validating a floating point value
+		else if($this->_type == 'float') {
+
+			// If the type is a bool, fail immediately
+			if(is_bool($value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'is a bool');
+				return false;
+			}
+
+			// If it's already a float
+			if(is_float($value)) {
+				//pass
+			}
+
+			// If it's an int or a valid representation of a float
+			else if(is_int($value) ||
+				(is_string($value) && preg_match($_typeToRegex['float'], $value))) {
+				$value = floatval($value);
+			}
+
+			// Else it can't be converted
+			else {
+				$this->validation_failures[] = array(implode('.', $level), 'can not be converted to float');
+				return false;
+			}
+		}
+
+		// Else if we are validating a JSON string
+		else if($this->_type == 'json') {
+
+			// If it's already a string
+			if(is_string($value)) {
+
+				// Try to decode it
+				if(json_decode($value) == null) {
+					$this->validation_failures[] = array(implode('.', $level), 'Can not be decoded from JSON');
+					return false;
+				}
+			}
+
+			// Else
+			else {
+
+				// Try to encode it
+				if(json_encode($value) == false) {
+					$this->validation_failures[] = array(implode('.', $level), 'Can not be encoded to JSON');
+					return false;
+				}
+			}
+		}
+
+		// Else if we are validating a price value
+		else if($this->_type == 'price') {
+
+			// If the type is a bool, fail immediately
+			if(is_bool($value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'is a bool');
+				return false;
+			}
+
+			// If it's a float
+			if(is_float($value)) {
+
+				// Convert it to a string
+				$value = strval($value);
+
+				// If it has too many decimal places
+				preg_match($_typeToRegex['price'], $value, $aMatches);
+				if(isset($aMatches[1]) && strlen($aMatches[1] > 2)) {
+					$this->validation_failures[] = array(implode('.', $level), 'too many decimal points');
+					return false;
+				}
+			}
+
+			// If it's an int, convert it to a string
+			else if(is_int($value)) {
+				$value = strval($value);
+			}
+
+			// Else if it's a string
+			else if(is_string($value)) {
+
+				// If the format is wrong
+				if(!preg_match($_typeToRegex['decimal'], $value)) {
+					$this->validation_failures[] = array(implode('.', $level), 'failed regex (internal)');
+					return false;
+				}
+			}
+
+			// Else we can't convert it
+			else {
+				$this->validation_failures[] = array(implode('.', $level), 'can not be converted to decimal');
+				return false;
+			}
+
+			// If there's options
+			if($this->_options) {
+
+				// Go through each one
+				foreach($this->_options as $d) {
+
+					// If they match, return OK
+					if(bccomp($value, $d) == 0) {
+						return true;
+					}
+				}
+			}
+
+			// Else if there's a min or max
+			else if($this->_minimum != null || $this->_maximum != null) {
+
+				// If there's a minimum and we don't reach it
+				if($this->_minimum != null && bccomp($value, $this->_minimum) == -1) {
+					$this->validation_failures[] = array(implode('.', $level), 'not long enough');
+					return false;
+				}
+
+				// If there's a maximum and we surpass it
+				if($this->_maximum != null && bccomp($value, $this->_maximum) == 1) {
+					$this->validation_failures[] = array(implode('.', $level), 'too long');
+					return false;
+				}
+
+				// Return OK
+				return true;
+			}
+		}
+
+		// Else if we are validating a string value
+		else if($this->_type == 'string') {
+
+			// If the value is not some form of string
+			if(!is_string($value)) {
+				$this->validation_failures[] = array(implode('.', $level), 'is not a string');
+				return false;
+			}
+
+			// If we have a regex
+			if($this->_regex) {
+
+				// If it doesn't match the regex
+				if(!preg_match($this->_regex, $value)) {
+					$this->validation_failures[] = array(implode('.', $level), 'failed regex (custom)');
+					return false;
+				}
+			}
+
+			// Else
+			else if($this->_minimum != null or $this->_maximum != null) {
+
+				// If there's a minimum length and we don't reach it
+				if($this->_minimum != null && strlen($value) < $this->_minimum) {
+					$this->validation_failures[] = array(implode('.', $level), 'not long enough');
+					return false;
+				}
+
+				// If there's a maximum length and we surpass it
+				if($this->_maximum != null && strlen($value) > $this->_maximum) {
+					$this->validation_failures[] = array(implode('.', $level), 'too long');
+					return false;
+				}
+
+				// Return OK
+				return true;
+			}
+		}
+
+		// If there's a list of options
+		if($this->_options) {
+
+			// Returns based on the option's existance
+			if(!in_array($value, $this->_options)) {
+				$this->validation_failures[] = array(implode('.', $level), 'not in options');
+				return false;
+			}
+			else {
+				return true;
+			}
+		}
+
+		// Else check for basic min/max
+		else {
+
+			// If the value is less than the minimum
+			if($this->_minimum != null && $value < $this->_minimum) {
+				$this->validation_failures[] = array(implode('.', $level), 'did not meet minimum');
+				return false;
+			}
+
+			// If the value is greater than the maximum
+			if($this->_maximum != null && $value > $this->_maximum) {
+				$this->validation_failures[] = array(implode('.', $level), 'exceeds maximum');
+				return false;
+			}
+		}
+
+		// Value has no issues
+		return true;
+	}
+}
+
+/**
+ * OptionsNode class
+ *
+ * Represents a node which can have several different types of values/Nodes and
+ * still be valid
+ *
+ * @implements _NodeInterface
+ */
+class OptionsNode implements _NodeInterface {
+
+	/**
+	 * List of valid Nodes
+	 * @var _NodeInterface[]
+	 */
+	protected $_nodes;
+
+	/**
+	 * Flag for whether the node is optional or not
+	 * @var bool
+	 */
+	protected $_optional;
+
+	/**
+	 * Holds a list of the last errors from failed valid() calls
+	 * @var string[][]
+	 */
+	public $validation_failures;
+
+	/**
+	 * Constructor
+	 *
+	 * Initialises the instance
+	 *
+	 * @name OptionsNode
+	 * @access public
+	 * @throws Exception
+	 * @param array $details			Details describing the type of vallues allowed for the node
+	 * @return OptionsNode
+	 */
+	public function __construct(array $details) {
+
+		// If details is not a true array
+		if(!isset($details[0])) {
+			throw Exception('details in OptionsNode must be an array (not associative)');
+		}
+
+		// Init the variable used to identify the last falures in validation
+		$this->validation_failures = array();
+
+		// Init the optional flag, assume all nodes are optional until we find
+		//	one that isn't
+		$this->_optional = true;
+
+		// Init the internal list
+		$this->_nodes = array();
+
+		// Go through each element in the list
+		for($i = 0; $i < count($details); ++$i) {
+
+			// If it's another Node instance
+			if($details[$i] instanceof _BaseNode) {
+				$this->_nodes[] = $details[$i];
+				continue;
+			}
+
+			// If the element is a dict instance
+			else if(is_array($details[$i])) {
+
+				// Store the child
+				$this->_nodes[] = _child($details[$i]);
+			}
+
+			// Whatever was sent is invalid
+			else {
+				throw Exception('details[' . $i .'] in OptionsNode must be an array');
+			}
+
+			// If the element is not optional, then the entire object can't be
+			//	optional
+			if(!$this->_nodes[$i]->_optional) {
+				$this->_optional = false;
+			}
+		}
+	}
+
+	/**
+	 * Class Name
+	 *
+	 * Returns a string representation of the name of the child class
+	 *
+	 * name className
+	 * @access public
+	 * @return string
+	 */
+	public function className() {
+		return 'OptionsNode';
+	}
+
+	/**
+	 * Clean
+	 *
+	 * Uses the valid method to check which type the value is, and then
+	 * calls the correct version of clean on that node
+	 *
+	 * @name clean
+	 * @access public
+	 * @throws Exception
+	 * @param mixed $value				The value to clean
+	 * @return mixed
+	 */
+	public function clean($value) {
+
+		// If the value is null and it's optional, return as is
+		if($value == null && $this->_optional) {
+			return null;
+		}
+
+		// Go through each of the nodes
+		for($i = 0; $i < count($this->_nodes); ++$i) {
+
+			// If it's valid
+			if($this->_nodes[$i].valid($value)) {
+
+				// Use its clean
+				return $this->_nodes[$i].clean($value);
+			}
+		}
+
+		// Something went wrong
+		throw Exception('invalid value');
+	}
+
+	/**
+	 * From File
+	 *
+	 * Loads a JSON file and creates an OptionsNode instance from it
+	 *
+	 * @name fromFile
+	 * @access public
+	 * @static
+	 * @param string $filename			The filename to load
+	 * @return OptionsNode
+	 */
+	public static function fromFile(/*string*/ $filename) {
+
+		// Get the contents of the file
+		$details = file_get_contents($filename);
+
+		// Decode the contents
+		$details = json_decode($details);
+
+		// Create and return the new instance
+		return new self($details);
+	}
+
+	/**
+	 * To Array
+	 *
+	 * Returns the Nodes as a list of dictionaries in the same format as is used
+	 * in constructing them
+	 *
+	 * @name toArray
+	 * @access public
+	 * @return array
+	 */
+	public function toArray() {
+
+		// Init the return array
+		$aRet = array();
+
+		// Go through each node and call toArray on it
+		for($i = 0; $i < count($this->_nodes); ++$i) {
+			$aRet[] = $this->_nodes[$i]->toArray();
+		}
+
+		// Return
+		return $aRet;
+	}
+
+	/**
+	 * To JSON
+	 *
+	 * Returns a JSON string representation of the instance
+	 *
+	 * @name toJSON
+	 * @access public
+	 * @return string
+	 */
+	public function toJSON() {
+		return json_encode($this->toArray());
+	}
+
+	/**
+	 * Valid
+	 *
+	 * Checks if a value is valid based on the instance's values
+	 *
+	 * @name valid
+	 * @access public
+	 * @param mixed $value				The value to validate
+	 * @return bool
+	 */
+	public function valid($value, array $level = array()) {
+
+		// Reset validation failures
+		$this->validation_failures = array();
+
+		// If the value is null and it's optional, we're good
+		if($value == null && $this->_optional) {
+			return true;
+		}
+
+		// Go through each of the nodes
+		for($i = 0; $i < count($this->_nodes); ++$i) {
+
+			// If it's valid
+			if($this->_nodes[$i].valid($value)) {
+				return true;
+			}
+		}
+
+		// Not valid for anything
+		$this->validation_failures[] = array(implode('.', $level), 'no valid option');
+		return false;
+	}
+}
+
+/**
+ * ParentNode class
+ *
+ * Represents defined keys mapped to other Nodes which themselves could be
+ * Parents
+ *
+ * @extends _BaseNode
+ */
+class ParentNode extends _BaseNode {
+
+	/**
+	 * Associative array of keys to _NodeInterface
+	 * @var array
+	 */
+	protected $_nodes;
+
+	/**
+	 * Associative array of fields required by other fields
+	 * @var array
+	 */
+	protected $_requires;
+
+	/**
+	 * Constructor
+	 *
+	 * Initialises the instance
+	 *
+	 * @name Parent
+	 * @access public
+	 * @throws Exception
+	 * @param array $details			Details describing the type of values allowed for the nodes
+	 * @return Parent
+	 */
+	public function __construct(array $details) {
+
+		// Init the nodes and requires arrays
+		$this->_nodes = array();
+		$this->_requires = array();
+
+		// Go through the keys in the details
+		foreach($details as $k => $v) {
+
+			// If key is standard
+			if(preg_match($_standardField, $k)) {
+
+				// If it's a Node
+				if($v instanceof _NodeInterface) {
+
+					// Store it as is
+					$this->_nodes[$k] = $v;
+				}
+
+				// Else
+				else {
+					$this->_nodes[$k] = _child($v);
+				}
+
+				// Remove the key from the details
+				unset($details[$k]);
+			}
+		}
+
+		// If there's a require hash available
+		if(isset($details['__require__'])) {
+			$this->requires($details['__require__']);
+			unset($details['__require__']);
+		}
+
+		// Call the parent constructor with whatever details are left
+		parent::__construct($details, 'Parent');
+	}
+
+	/**
+	 * __isset
+	 *
+	 * Returns if the key exists in the Parent
+	 *
+	 * @name __isset
+	 * @access public
+	 * @param string $k					The key to check for in the Parent
+	 * @return bool
+	 */
+	public function __isset($k) {
+		return isset($this->_nodes[$k]);
+	}
+
+	/**
+	 * __get
+	 *
+	 * Returns the Node at the given key
+	 *
+	 * @name __get
+	 * @access public
+	 * @param string $k					The key to return the Node at in the Parent
+	 * @return _NodeInterface
+	 */
+	public function &__get($k) {
+		return $this->_nodes[$k];
+	}
+
+	/**
+	 * Clean
+	 *
+	 * Goes through each of the values in the array, cleans it, stores it, and
+	 * returns a new array
+	 *
+	 * @name clean
+	 * @access public
+	 * @throws Exception
+	 * @param array $value				The value to clean
+	 * @return array
+	 */
+	public function clean($value) {
+
+		// If the value is null and it's optional, return as is
+		if($value == null && $this->_optional) {
+			return null;
+		}
+
+		// If the value is not a dict
+		if(!is_array($value)) {
+			throw Exception('value');
+		}
+
+		// Init the return value
+		$aRet = array();
+
+		// Go through each value and clean it using the associated node
+		foreach($value as $k => $v) {
+
+			// If the key doesn't exist
+			if(!isset($this->_nodes[$k])) {
+				throw Exception(strval($k) . ' is not a valid node in the parent');
+			}
+
+			// Clean the value
+			$aRet[$k] = $this->_nodes[$k].clean($value[$k]);
+		}
+
+		// Return the cleaned values
+		return $aRet;
+	}
+
+	/**
+	 * Contains
+	 *
+	 * Returns whether a specific key exists in the Parent
+	 *
+	 * @name contains
+	 * @access public
+	 * @param string $key				The key to check for
+	 * @return bool
+	 */
+	public function contains($key) {
+		return isset($this->_nodes[$key]);
+	}
+
+	/**
+	 * Get
+	 *
+	 * Returns the node of a specific key from the Parent
+	 *
+	 * @name get
+	 * @access public
+	 * @param string $key				The name of the key to return
+	 * @param mixed $default			The value to return if the key isn't found
+	 * @return _NodeInterface
+	 */
+	public function get($key, $default = null) {
+		if(isset($this->_nodes[$key])) return $this->_nodes[$key];
+		else return $default;
+	}
+
+	/**
+	 * Keys
+	 *
+	 * Returns an array of the Node names in the Parent
+	 *
+	 * @name keys
+	 * @access public
+	 * @return string[]
+	 */
+	public function keys() {
+		return array_keys($this->_nodes);
+	}
+
+	/**
+	 * Requires
+	 *
+	 * Sets or gets the require rules used to validate the Parent
+	 *
+	 * @name requires
+	 * @param  array  $require [description]
+	 * @return [type]          [description]
+	 */
+	protected function requires($require = null) {
+
+		// If require is null, this is a getter
+		if($require == null) {
+			return $this->_requires;
+		}
+
+		// If it's not a valid array
+		if(!is_array($require)) {
+			throw Exception('__require__');
+		}
+
+		// Go through each key and make sure it goes with a field
+		foreach($require as $k => $v) {
+
+			// If the field doesn't exist
+			if(!isset($this->_nodes[$k])) {
+				throw Exception('__require__[' . strval($k) . ']');
+			}
+
+			// If the value is a string
+			if(is_string($v)) {
+				$v = [$v];
+			}
+
+			// Else if it's not a non-associative array
+			else if(!is_array($v) || !isset($v[0])) {
+				throw Exception('__require__[' . strval($k) . ']');
+			}
+
+			// Make sure each required field also exists
+			for($i = 0; $i < count($v); ++$i) {
+				if(!isset($this->_nodes[$v[$i]])) {
+					throw Exception('__require__[' . strval($k) . ']: ' . implode(',', $v));
+				}
+			}
+
+			// If it's all good
+			$this->_requires[$k] = $v;
+		}
+	}
+
+	/**
+	 * To Array
+	 *
+	 * Returns the Parent as an associative array in the same format as is used
+	 * in constructing it
+	 *
+	 * @name toArray
+	 * @access public
+	 * @return array
+	 */
+	public function toArray() {
+
+		// Get the parents array
+		$aRet = parent::toArray();
+
+		// Go through each field and add it to the return
+		foreach($this->_nodes as $k => $v) {
+			$aRet[$k] = $v.toArray();
+		}
+
+		// Return
+		return $aRet;
+	}
+
+	/**
+	 * Valid
+	 *
+	 * Checks if a value is valid based on the instance's values
+	 *
+	 * @name valid
+	 * @access public
+	 * @param array $value				The value to validate
+	 * @return bool
+	 */
+	public function valid($value, array $level = array()) {
+
+		// Reset validation failures
+		$this->validation_failures = array();
+
+		// If the value is null and it's optional, we're good
+		if(value == null && $this->_optional) {
+			return true;
+		}
+
+		// If the value isn't a dictionary
+		if(!is_array($value)) {
+			$this->validation_failures[] = array(implode('.', $level), strval(value));
+			return false;
+		}
+
+		// Init the return, assume valid
+		$bRet = true;
+
+		// Go through each node in the instance
+		foreach($this->_nodes as $k => $n) {
+
+			// Add the field to the level
+			$lLevel = $level;
+			$lLevel[] = $k;
+
+			// If we are missing a node
+			if(!isset($value[$k])) {
+
+				// If the value is not optional
+				if(!$n->_optional) {
+					$this->validation_failures[] = array(implode('.', $lLevel), 'missing');
+					$bRet = false;
+				}
+
+				// Continue to next node
+				continue;
+			}
+
+			// If the element isn't valid, return false
+			if(!$n->valid($value[$k], $lLevel)) {
+				$this->validation_failures = array_merge(
+					$this->validation_failures,
+					$n->validation_failures
+				);
+				$bRet = false;
+				continue;
+			}
+
+			// If the element requires others
+			if(isset($this->_requires[$k])) {
+
+				// Go through each required field
+				foreach($this->_requires[$k] as $f) {
+
+					// If the field doesn't exist in the value
+					if(!isset($value[$f]) || in_array($value[$f], array('0000-00-00','',null))) {
+						$this->validation_failures[] = array(implode('.', $lLevel), 'requires "' . strval($f) . '" to also be set');
+						$bRet = false;
+					}
+				}
+			}
+		}
+
+		// Return whatever the result was
+		return $bRet;
 	}
 }
