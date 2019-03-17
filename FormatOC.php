@@ -11,42 +11,55 @@
 
 namespace FormatOC;
 
-/**#@+
- * Special
- *
- * Holds regexes to match special hash elements
- */
-$_specialSyntax = '[a-z0-9_-]+';
-$_specialName = '/^' . $_specialSyntax . '$/';
-$_specialKey = '/^__' . $_specialSyntax . '__$/';
-$_specialSet = '__%s__';
-/**#@-*/
+define("_SPECIAL_SYNTAX", '[a-z0-9_-]+');
 
 /**
- * Standard
- *
- * Holds a regex to match any standard named fields. These are limited in order
- * to ease the ability to plugin additional data stores
+ * Because having to declare global everywhere is bullshit
  */
-$_standardField = '/^_?[a-zA-Z][a-zA-Z0-9_]*$/';
+abstract class _Types {
 
-/**
- * Type to Regex
- *
- * Halds a hash of type values to the regular expression used to validate them
- */
-$_typeToRegex = array(
-	'base64'	=> '/^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/',
-	'date'		=> '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/',
-	'datetime'	=> '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
-	'decimal'	=> '/^-?(?:[1-9]\d+|\d)(?:\.\d+)?$/',
-	'int'		=> '/^(?:0|[+-]?[1-9]\d*|0x[0-9a-f]+|0[0-7]+)$/',
-	'ip'		=> '/^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){2}\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])$/',
-	'md5'		=> '/^[a-fA-F0-9]{32}$/',
-	'price'		=> '/^-?(?:[1-9]\d+|\d)(?:\.(\d{1,2}))?$/',
-	'time'		=> '/^(?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
-	'uuid'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/'
-);
+	/**#@+
+	 * Special
+	 *
+	 * Holds regexes to match special hash elements
+	 */
+	public static $special = array(
+		"name" => '/^' . _SPECIAL_SYNTAX . '$/',
+		"key" => '/^__(' . _SPECIAL_SYNTAX . ')__$/',
+		"reserved" => array(
+			'__array__', '__hash__', '__maximum__', '__minimum__', '__name__',
+			'__options__', '__regex__', '__require__', '__type__'
+		)
+	);
+
+	/**#@-*/
+
+	/**
+	 * Standard
+	 *
+	 * Holds a regex to match any standard named fields. These are limited in order
+	 * to ease the ability to plugin additional data stores
+	 */
+	public static $standard = '/^_?[a-zA-Z][a-zA-Z0-9_]*$/';
+
+	/**
+	 * Type to Regex
+	 *
+	 * Halds a hash of type values to the regular expression used to validate them
+	 */
+	public static $regex = array(
+		'base64'	=> '/^(?:[A-Za-z0-9+\/]{4})+(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/',
+		'date'		=> '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/',
+		'datetime'	=> '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
+		'decimal'	=> '/^-?(?:[1-9]\d+|\d)(?:\.\d+)?$/',
+		'int'		=> '/^(?:0|[+-]?[1-9]\d*|0x[0-9a-f]+|0[0-7]+)$/',
+		'ip'		=> '/^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){2}\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])$/',
+		'md5'		=> '/^[a-fA-F0-9]{32}$/',
+		'price'		=> '/^-?(?:[1-9]\d+|\d)(?:\.(\d{1,2}))?$/',
+		'time'		=> '/^(?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
+		'uuid'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/'
+	);
+}
 
 /**
  * Child
@@ -86,7 +99,7 @@ function _child($details) {
 			else if(isset($details['__type__'])) {
 
 				// If the type is an array, this is a complex type
-				if(is_array($details)) {
+				if(is_array($details['__type__'])) {
 					return _child($details['__type__']);
 				}
 
@@ -112,7 +125,7 @@ function _child($details) {
 
 	// Else throw an error
 	else {
-		throw Exception('details');
+		throw new \Exception('details');
 	}
 }
 
@@ -167,7 +180,7 @@ interface _NodeInterface {
 	public function toArray();
 	public function toJSON();
 	public function className();
-	public function valid($value, array $level);
+	public function valid($value, $level);
 }
 
 /**
@@ -249,12 +262,17 @@ abstract class _BaseNode implements _NodeInterface {
 		// If there are any other special fields in the details
 		foreach($details as $k => $v) {
 
+			// If the key is used by the child
+			if(in_array($k, _Types::$special['reserved'])) {
+				continue;
+			}
+
 			// If key is special
-			if(preg_match(_specialKey, k, $aMatch)) {
+			if(preg_match(_Types::$special['key'], $k, $aMatch)) {
 
 				// Store it with the other specials then remove it
-				$this->_special[$aMatch[1]] = $details[k];
-				unset($details[k]);
+				$this->_special[$aMatch[1]] = $details[$k];
+				unset($details[$k]);
 			}
 		}
 	}
@@ -296,6 +314,29 @@ abstract class _BaseNode implements _NodeInterface {
 	}
 
 	/**
+	 * Optional
+	 *
+	 * Getter/Setter method for optional flag
+	 *
+	 * @name optional
+	 * @access public
+	 * @param bool $value				If set, the method is a setter
+	 * @return bool | void
+	 */
+	public function optional($value = null) {
+
+		// If there's no value, this is a getter
+		if(is_null($value)) {
+			return $this->_optional;
+		}
+
+		// Else, set the flag
+		else {
+			$this->_optional = $value ? true : false;
+		}
+	}
+
+	/**
 	 * Special
 	 *
 	 * Getter/Setter method for special values associated with nodes that are
@@ -312,16 +353,16 @@ abstract class _BaseNode implements _NodeInterface {
 
 		// Check the name is a string
 		if(!is_string($name)) {
-			throw Exception('name must be a string');
+			throw new \Exception('name must be a string');
 		}
 
 		// Check the name is valid
-		if(!preg_match($_specialName, $name)) {
-			throw Exception('special name must match "' . _specialSyntax . '"');
+		if(!preg_match(_Types::$special['name'], $name)) {
+			throw new \Exception('special name must match "' . _specialSyntax . '"');
 		}
 
 		// If the value is not set, this is a getter
-		if($value == null) {
+		if(is_null($value)) {
 
 			// Return the value or null
 			return isset($this->_special[$name]) ? $this->_special[$name] : null;
@@ -332,7 +373,7 @@ abstract class _BaseNode implements _NodeInterface {
 
 			// If we can't convert the value to JSON
 			if(json_encode($value) === false) {
-				throw Exception('value can not be encoded to JSON');
+				throw new \Exception('value can not be encoded to JSON');
 			}
 
 			// Save it
@@ -362,7 +403,7 @@ abstract class _BaseNode implements _NodeInterface {
 
 		// Add all the special fields found
 		foreach($this->_special as $k => $v) {
-			$aRet[$k] = $v;
+			$aRet['__' . $k . '__'] = $v;
 		}
 
 		// Return
@@ -431,6 +472,11 @@ class ArrayNode extends _BaseNode {
 	 */
 	public function __construct(array $details) {
 
+		// If the array config is not found
+		if(!isset($details['__array__'])) {
+			throw new \Exception('missing "__array__" in details');
+		}
+
 		// If __array__ is not an array
 		if(!is_array($details['__array__'])) {
 			$details['__array__'] = array(
@@ -438,14 +484,16 @@ class ArrayNode extends _BaseNode {
 			);
 		}
 
-		// If the type is missing
-		if(!isset($details['__array__']['type'])) {
-			$this->_type = 'unique';
-		}
+		// Call parent constructor
+		parent::__construct($details, 'ArrayNode');
 
-		// Or if the type is invalid
-		else if(!in_array($details['__array__']['type'], self::$_VALID_ARRAY)) {
-			$this->_type = 'unique';
+		// Init the protect vars
+		$this->_minimum = null;
+		$this->_maximum = null;
+		$this->_type = 'unique';
+		$this->_node = null;
+
+		if(!in_array($details['__array__']['type'], self::$_VALID_ARRAY)) {
 			fwrite(STDERR, '"' . strval($details['__array__']['type']) . '" is not a valid type for __array__, assuming "unique"');
 		}
 
@@ -453,10 +501,6 @@ class ArrayNode extends _BaseNode {
 		else {
 			$this->_type = $details['__array__']['type'];
 		}
-
-		// Init the min/max values
-		$this->_minimum = null;
-		$this->_maximum = null;
 
 		// If there's a minimum or maximum present
 		$bMin = isset($details['__array__']['minimum']);
@@ -468,31 +512,11 @@ class ArrayNode extends _BaseNode {
 			);
 		}
 
-		// If there's an optional flag somewhere in the mix
-		if(isset($details['__optional__'])) {
-			$bOptional = $details['__optional__'];
-			unset($details['__optional__']);
-		}
-		else if(isset($details['__array__']['optional'])) {
-			$bOptional = $details['__array__']['optional'];
-		}
-		else {
-			$bOptional = null;
-		}
-
 		// Remove the __array__ field from details
 		unset($details['__array__']);
 
 		// Store the child
 		$this->_node = _child($details);
-
-		// If we had an optional flag, add it for the parent constructor
-		if($bOptional) {
-			$details['__optional__'] = $bOptional;
-		}
-
-		// Call parent constructor
-		parent::__construct($details, 'ArrayNode');
 	}
 
 	/**
@@ -522,7 +546,7 @@ class ArrayNode extends _BaseNode {
 
 				// If it's a valid representation of an integer
 				if(is_string($minimum) &&
-					preg_match($_typeToRegex['int'], $minimum)) {
+					preg_match(_Types::$regex['int'], $minimum)) {
 
 					// Convert it
 					$minimum = intval($minimum, 0);
@@ -530,13 +554,13 @@ class ArrayNode extends _BaseNode {
 
 				// Else, throw an error
 				else {
-					throw Exception('__minimum__');
+					throw new \Exception('__minimum__');
 				}
 			}
 
 			// If it's below zero
 			if($minimum < 0) {
-				throw Exception('__minimum__');
+				throw new \Exception('__minimum__');
 			}
 
 			// Store the minimum
@@ -551,7 +575,7 @@ class ArrayNode extends _BaseNode {
 
 				// If it's a valid representation of an integer
 				if(is_string($maximum) &&
-					preg_match($_typeToRegex['int'], $maximum)) {
+					preg_match(_Types::$regex['int'], $maximum)) {
 
 					// Convert it
 					$maximum = intval($maximum, 0);
@@ -559,18 +583,18 @@ class ArrayNode extends _BaseNode {
 
 				// Else, throw an error
 				else {
-					throw Exception('__minimum__');
+					throw new \Exception('__minimum__');
 				}
 			}
 
 			// It's below zero
 			if($maximum < 0) {
-				throw Exception('__maximum__');
+				throw new \Exception('__maximum__');
 			}
 
 			// If we also have a minimum and the max is somehow below it
 			if($this->_minimum && $maximum < $this->_minimum) {
-				throw Exception('__maximum__');
+				throw new \Exception('__maximum__');
 			}
 
 			// Store the maximum
@@ -593,19 +617,19 @@ class ArrayNode extends _BaseNode {
 	public function clean($value) {
 
 		// If the value is null and it's optional, return as is
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return null;
 		}
 
 		// If the value is not an array
 		if(!is_array($value)) {
-			throw Exception('value');
+			throw new \Exception('value');
 		}
 
 		// Recurse and return it
 		$aRet = array();
 		for($i = 0; $i < count($value); ++$i) {
-			$aRet[] = $this->_node.clean($value[$i]);
+			$aRet[] = $this->_node->clean($value[$i]);
 		}
 		return $aRet;
 	}
@@ -653,7 +677,7 @@ class ArrayNode extends _BaseNode {
 		return array_merge(
 			$aRet,
 			parent::toArray(),
-			$this->_node.toArray()
+			$this->_node->toArray()
 		);
 	}
 
@@ -667,14 +691,19 @@ class ArrayNode extends _BaseNode {
 	 * @param array $value				The value to validate
 	 * @return bool
 	 */
-	public function valid($value, array $level = array()) {
+	public function valid($value, $level = array()) {
 
 		// Reset validation failures
 		$this->validation_failures = array();
 
 		// If the value is null and it's optional, we're good
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return true;
+		}
+
+		// If the level is not an array
+		if(!is_array($level)) {
+			throw new \Exception('level');
 		}
 
 		// If the value isn't a list
@@ -696,11 +725,11 @@ class ArrayNode extends _BaseNode {
 
 			// Add the field to the level
 			$lLevel = $level;
-			$lLevel[] = '[' . i . ']';
+			$lLevel[] = '[' . $i . ']';
 
 			// If the element isn't valid, return false
-			if(!$this->_node.valid($value[i], $lLevel)) {
-				$this->validation_failures = array_merge($this->validation_failures, $this->_node.validation_failures);
+			if(!$this->_node->valid($value[$i], $lLevel)) {
+				$this->validation_failures = array_merge($this->validation_failures, $this->_node->validation_failures);
 				$bRet = false;
 				continue;
 			}
@@ -709,14 +738,14 @@ class ArrayNode extends _BaseNode {
 			if($this->_type == 'unique') {
 
 				// If the value already exists, add the error to the list
-				if(($iIndex = array_search($value[$i], $aItems)) === false) {
+				if(($iIndex = array_search($value[$i], $aItems)) !== false) {
 					$this->validation_failures[] = array(implode('.', $lLevel), 'duplicate of ' . implode('.', $level) . '[' . $iIndex . ']');
 					$bRet = false;
 					continue;
 				}
 
 				// Add the value to the array and continue
-				$lItems[] = $value[i];
+				$aItems[] = $value[$i];
 			}
 		}
 
@@ -770,17 +799,11 @@ class HashNode extends _BaseNode {
 
 		// If the hash config is not found
 		if(!isset($details['__hash__'])) {
-			throw Exception('__hash__ not in details');
+			throw new \Exception('missing "__hash__" in details');
 		}
 
-		// If there's an optional flag somewhere in the mix
-		if(isset($details['__optional__'])) {
-			$bOptional = $details['__optional__'];
-			unset($details['__optional__']);
-		}
-		else {
-			$bOptional = null;
-		}
+		// Call the parent constructor
+		parent::__construct($details, 'HashNode');
 
 		// If the hash is simply set to True, make it a string with no
 		//	requirements
@@ -796,14 +819,6 @@ class HashNode extends _BaseNode {
 
 		// Store the child
 		$this->_node = _child($details);
-
-		// If we had an optional flag, add it for the parent constructor
-		if($bOptional) {
-			$details['__optional__'] = $bOptional;
-		}
-
-		// Call the parent constructor
-		parent::__construct($details, 'HashNode');
 	}
 
 	/**
@@ -821,19 +836,19 @@ class HashNode extends _BaseNode {
 	public function clean($value) {
 
 		// If the value is null and it's optional, return as is
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return null;
 		}
 
 		// If the value is not a dict
 		if(!is_array($value)) {
-			throw Exception('value');
+			throw new \Exception('value');
 		}
 
 		// Recurse and return it
 		$aRet = array();
 		foreach($value as $k => $v) {
-			$aRet[$this->_key.clean($k)] = $this->_node.clean($v);
+			$aRet[$this->_key->clean($k)] = $this->_node->clean($v);
 		}
 		return $aRet;
 	}
@@ -868,19 +883,24 @@ class HashNode extends _BaseNode {
 	 * @param array $value				The value to validate
 	 * @return bool
 	 */
-	public function valid($value, array $level = array()) {
+	public function valid($value, $level = array()) {
 
 		// Reset validation failures
 		$this->validation_failures = array();
 
 		// If the value is null and it's optional, we're good
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return true;
+		}
+
+		// If the level is not an array
+		if(!is_array($level)) {
+			throw new \Exception('level');
 		}
 
 		// If the value isn't an array
 		if(!is_array($value)) {
-			$this->validation_failures[] = array(implode('.', level), strval($value));
+			$this->validation_failures[] = array(implode('.', $level), strval($value));
 			return false;
 		}
 
@@ -895,15 +915,15 @@ class HashNode extends _BaseNode {
 			$lLevel[] = $k;
 
 			// If the key isn't valid
-			if(!$this->_key.valid(k)) {
-				$this->validation_failures[] = array(implode('.', lLevel), 'invalid key: ' + strval($k));
+			if(!$this->_key->valid($k)) {
+				$this->validation_failures[] = array(implode('.', $lLevel), 'invalid key: ' + strval($k));
 				$bRet = false;
 				continue;
 			}
 
 			// Check the value
-			if(!$this->_node.valid($v, $lLevel)) {
-				$this->validation_failures = array_merge($this->validation_failures, $this->_node.validation_failures);
+			if(!$this->_node->valid($v, $lLevel)) {
+				$this->validation_failures = array_merge($this->validation_failures, $this->_node->validation_failures);
 				$bRet = false;
 				continue;
 			}
@@ -976,17 +996,24 @@ class Node extends _BaseNode {
 
 		// If details is not an array
 		else if(!is_array($details)) {
-			throw Exception('details');
+			throw new \Exception('details must be an array');
 		}
 
-		// If the type is not found or is invalid
-		if(!isset($details['__type__']) || !in_array($details['__type__'], $this->_VALID_TYPES)) {
-			throw Exception('__type__ not in details');
+		// If the type is not found
+		if(!isset($details['__type__'])) {
+			throw new \Exception('missing "__type__" in details');
 		}
+
+		// If the type is invalid
+		if(!in_array($details['__type__'], self::$_VALID_TYPES)) {
+			throw new \Exception('invalid "__type__" in details');
+		}
+
+		// Call the parent constructor
+		parent::__construct($details, 'Node');
 
 		// Store the type and remove it from the details
 		$this->_type = $details['__type__'];
-		unset($details['__type__']);
 
 		// Init the value types
 		$this->_regex = null;
@@ -997,13 +1024,11 @@ class Node extends _BaseNode {
 		// If there's a regex string available
 		if(isset($details['__regex__'])) {
 			$this->regex($details['__regex__']);
-			unset($details['__regex__']);
 		}
 
 		// Else if there's a list of options
 		else if(isset($details['__options__'])) {
 			$this->options($details['__options__']);
-			unset($details['__options__']);
 		}
 
 		// Else
@@ -1019,13 +1044,7 @@ class Node extends _BaseNode {
 					$bMax ? $details['__maximum__'] : null
 				);
 			}
-
-			if($bMin) unset($details['__minimum__']);
-			if($bMax) unset($details['__maximum__']);
 		}
-
-		// Call the parent constructor
-		parent::__construct($details, 'Node');
 	}
 
 	/**
@@ -1041,7 +1060,7 @@ class Node extends _BaseNode {
 	public function clean($value) {
 
 		// If the value is null and it's optional, return as is
-		if(value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return null;
 		}
 
@@ -1080,7 +1099,7 @@ class Node extends _BaseNode {
 
 			// If it's a PHP type, call format on it
 			if($value instanceof \DateTime) {
-				$value = $value.format('Y-m-d');
+				$value = $value->format('Y-m-d');
 			}
 
 			// Else if it's already a string
@@ -1099,7 +1118,7 @@ class Node extends _BaseNode {
 
 			// If it's a PHP type, call format on it
 			if($value instanceof \DateTime) {
-				$value = $value.format('Y-m-d H:i:s');
+				$value = $value->format('Y-m-d H:i:s');
 			}
 
 			// Else if it's already a string
@@ -1205,7 +1224,7 @@ class Node extends _BaseNode {
 
 			// If it's a PHP type, use format on it
 			if($value instanceof \DateTime) {
-				$value = $value.format('H:i:s');
+				$value = $value->format('H:i:s');
 			}
 
 			// Else if it's already a string
@@ -1221,7 +1240,7 @@ class Node extends _BaseNode {
 
 		// Else we probably forgot to add a new type
 		else {
-			throw Exception($this->_type . ' has not been added to .clean()');
+			throw new \Exception($this->_type . ' has not been added to ->clean()');
 		}
 
 		// Return the cleaned value
@@ -1241,7 +1260,7 @@ class Node extends _BaseNode {
 	 * @param mixed $maxium				The maximum value
 	 * @return array | void
 	 */
-	public function minmax($minimum = null, $maxium = null) {
+	public function minmax($minimum = null, $maximum = null) {
 
 		// If neither min or max is set, this is a getter
 		if($minimum == null && $maximum == null) {
@@ -1256,8 +1275,8 @@ class Node extends _BaseNode {
 
 				// Make sure the value is valid for the type
 				if(!is_string($minimum) ||
-					!preg_match($_typeToRegex[$this->_type], $minimum)) {
-					throw Exception('__minimum__');
+					!preg_match(_Types::$regex[$this->_type], $minimum)) {
+					throw new \Exception('__minimum__');
 				}
 			}
 
@@ -1270,7 +1289,7 @@ class Node extends _BaseNode {
 
 					// If it's a valid representation of an integer
 					if(is_string($minimum) &&
-						preg_match($_typeToRegex['int'], $minimum)) {
+						preg_match(_Types::$regex['int'], $minimum)) {
 
 						// Convert it
 						$minimum = intval($minimum, 0);
@@ -1278,7 +1297,7 @@ class Node extends _BaseNode {
 
 					// Else, throw an error
 					else {
-						throw Exception('__minimum__');
+						throw new \Exception('__minimum__');
 					}
 
 					// If the type is meant to be unsigned
@@ -1286,7 +1305,7 @@ class Node extends _BaseNode {
 
 						// And it's below zero
 						if($minimum < 0) {
-							throw Exception('__minimum__');
+							throw new \Exception('__minimum__');
 						}
 					}
 				}
@@ -1301,8 +1320,8 @@ class Node extends _BaseNode {
 				}
 
 				// If it doesn't fit the regex
-				if(!preg_match($_typeToRegex['decimal'], $minimum)) {
-					throw Exception('__minimum__');
+				if(!preg_match(_Types::$regex['decimal'], $minimum)) {
+					throw new \Exception('__minimum__');
 				}
 			}
 
@@ -1320,14 +1339,14 @@ class Node extends _BaseNode {
 
 				// If it's not a valid representation of a price
 				if(!is_string($minimum) ||
-					!preg_match($_typeToRegex['price'], $minimum)) {
-					throw Exception('__minimum__');
+					!preg_match(_Types::$regex['price'], $minimum)) {
+					throw new \Exception('__minimum__');
 				}
 			}
 
 			// Else we can't have a minimum
 			else {
-				throw Exception('can not set __minimum__ for ' . $this->_type);
+				throw new \Exception('can not set __minimum__ for ' . $this->_type);
 			}
 
 			// Store the minimum
@@ -1342,8 +1361,8 @@ class Node extends _BaseNode {
 
 				// Make sure the value is valid for the type
 				if(!is_string($maximum) ||
-					!preg_match($_typeToRegex[$this->_type], $maximum)) {
-					throw Exception('__maximum__');
+					!preg_match(_Types::$regex[$this->_type], $maximum)) {
+					throw new \Exception('__maximum__');
 				}
 			}
 
@@ -1356,7 +1375,7 @@ class Node extends _BaseNode {
 
 					// If it's a valid representation of an integer
 					if(!is_string($maximum) &&
-						!preg_match($_typeToRegex['int'], $maximum)) {
+						!preg_match(_Types::$regex['int'], $maximum)) {
 
 						// Convert it
 						$maximum = intval($maximum, 0);
@@ -1364,7 +1383,7 @@ class Node extends _BaseNode {
 
 					// Else, throw an error
 					else {
-						throw Exception('__maximum__');
+						throw new \Exception('__maximum__');
 					}
 
 					// If the type is meant to be unsigned
@@ -1372,7 +1391,7 @@ class Node extends _BaseNode {
 
 						// And it's below zero
 						if($maximum < 0) {
-							throw Exception('__maximum__');
+							throw new \Exception('__maximum__');
 						}
 					}
 				}
@@ -1387,8 +1406,8 @@ class Node extends _BaseNode {
 				}
 
 				// If it doesn't fit the regex
-				if(!preg_match($_typeToRegex['decimal'], $maximum)) {
-					throw Exception('__maximum__');
+				if(!preg_match(_Types::$regex['decimal'], $maximum)) {
+					throw new \Exception('__maximum__');
 				}
 			}
 
@@ -1406,14 +1425,14 @@ class Node extends _BaseNode {
 
 				// If it's not a valid representation of a price
 				if(!is_string($maximum) ||
-					!preg_match($_typeToRegex['price'], $maximum)) {
-					throw Exception('__maximum__');
+					!preg_match(_Types::$regex['price'], $maximum)) {
+					throw new \Exception('__maximum__');
 				}
 			}
 
 			// Else we can't have a maximum
 			else {
-				throw Exception('can not set __maximum__ for ' . $this->_type);
+				throw new \Exception('can not set __maximum__ for ' . $this->_type);
 			}
 
 			// If we also have a minimum
@@ -1424,7 +1443,7 @@ class Node extends _BaseNode {
 
 					// If the min is above the max, we have a problem
 					if(_compare_ips($this->_minimum, $maximum) == 1) {
-						throw Exception('__maximum__');
+						throw new \Exception('__maximum__');
 					}
 				}
 
@@ -1433,7 +1452,7 @@ class Node extends _BaseNode {
 
 					// If the min is above the max, we have a problem
 					if($this->_minimum > $maximum) {
-						throw Exception('__maximum__');
+						throw new \Exception('__maximum__');
 					}
 				}
 			}
@@ -1454,16 +1473,16 @@ class Node extends _BaseNode {
 	 * @param array $opts				An array of valid values for the Node
 	 * @return array | void
 	 */
-	public function options($opts = null) {
+	public function options($options = null) {
 
 		// If opts aren't set, this is a getter
-		if(options == null) {
+		if($options == null) {
 			return $this->_options;
 		}
 
 		// If the options are not a list
 		if(!is_array($options) || !isset($options[0])) {
-			throw Exception('options');
+			throw new \Exception('options');
 		}
 
 		// If the type is not one that can have options
@@ -1471,7 +1490,7 @@ class Node extends _BaseNode {
 				'base64', 'date', 'datetime', 'decimal', 'float',
 				'int', 'ip', 'md5', 'price', 'string', 'time',
 				'timestamp', 'uint', 'uuid'))) {
-			throw Exception('can not set __options__ for ' . $this->_type);
+			throw new \Exception('can not set __options__ for ' . $this->_type);
 		}
 
 		// Init the list of options to be saved
@@ -1486,9 +1505,9 @@ class Node extends _BaseNode {
 
 				// If the value is not a string or doesn't match its regex, throw
 				//	an error
-				if(is_string($options[$i]) ||
-					!preg_match($_typeToRegex[$this->_type], $options[$i])) {
-					throw Exception('__options__[' . $i . ']');
+				if(!is_string($options[$i]) ||
+					!preg_match(_Types::$regex[$this->_type], $options[$i])) {
+					throw new \Exception('__options__[' . $i . ']');
 				}
 			}
 
@@ -1501,8 +1520,8 @@ class Node extends _BaseNode {
 				}
 
 				// If it doesn't fit the regex
-				if(!preg_match($_typeToRegex['decimal'], $options[$i])) {
-					throw Exception('__options__[' . $i . ']');
+				if(!preg_match(_Types::$regex['decimal'], $options[$i])) {
+					throw new \Exception('__options__[' . $i . ']');
 				}
 			}
 
@@ -1523,7 +1542,7 @@ class Node extends _BaseNode {
 
 					// And we don't have a string
 					if(!is_string($options[$i])) {
-						throw Exception('__options__[' . $i . ']');
+						throw new \Exception('__options__[' . $i . ']');
 					}
 
 					// Convert it
@@ -1532,7 +1551,7 @@ class Node extends _BaseNode {
 
 				// If the type is unsigned and negative, throw an error
 				if(in_array($this->_type, array('timestamp', 'uint')) && $options[$i] < 0) {
-					throw Exception('__options__[' . $i . ']');
+					throw new \Exception('__options__[' . $i . ']');
 				}
 			}
 
@@ -1541,8 +1560,8 @@ class Node extends _BaseNode {
 
 				// If it's not a valid representation of a price
 				if(!is_string($options[$i]) ||
-					!preg_match($_typeToRegex['price'], $options[$i])) {
-					throw Exception('__options__[' . $i . ']');
+					!preg_match(_Types::$regex['price'], $options[$i])) {
+					throw new \Exception('__options__[' . $i . ']');
 				}
 			}
 
@@ -1557,7 +1576,7 @@ class Node extends _BaseNode {
 
 			// Else we have no validation for the type
 			else {
-				throw Exception('can not set __options__ for ' . $this->_type);
+				throw new \Exception('can not set __options__ for ' . $this->_type);
 			}
 
 			// If it's already in the list, throw an error
@@ -1601,11 +1620,53 @@ class Node extends _BaseNode {
 
 		// If it's not a valid string or regex
 		if(!is_string($regex)) {
-			throw Exception('__regex__');
+			throw new \Exception('__regex__');
 		}
 
 		// Store the regex
 		$this->_regex = $regex;
+	}
+
+	/**
+	 * To Array
+	 *
+	 * Returns the basic node as an array in the same format as is used in
+	 * constructing it
+	 *
+	 * @name toArray
+	 * @access public
+	 * @return array
+	 */
+	public function toArray() {
+
+		// Call the parent method
+		$aRet = parent::toArray();
+
+		// Add the type
+		$aRet['__type__'] = $this->_type;
+
+		// If there's a regex
+		if(!is_null($this->_regex)) {
+			$aRet['__regex__'] = $this->_regex;
+		}
+
+		// If there are options
+		if(!is_null($this->_options)) {
+			$aRet['__options__'] = $this->_options;
+		}
+
+		// If there's a minimum
+		if(!is_null($this->_minimum)) {
+			$aRet['__minimum__'] = $this->_minimum;
+		}
+
+		// If there's a maximum
+		if(!is_null($this->_maximum)) {
+			$aRet['__maximum__'] = $this->_maximum;
+		}
+
+		// Return
+		return $aRet;
 	}
 
 	/**
@@ -1631,14 +1692,19 @@ class Node extends _BaseNode {
 	 * @param mixed $value				The value to validate
 	 * @return bool
 	 */
-	public function valid($value, array $level = array()) {
+	public function valid($value, $level = array()) {
 
 		// Reset validation failures
 		$this->validation_failures = array();
 
 		// If the value is null and it's optional, we're good
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return true;
+		}
+
+		// If the level is not an array
+		if(!is_array($level)) {
+			throw new \Exception('level');
 		}
 
 		// If we are validating an ANY field, immediately return true
@@ -1651,16 +1717,16 @@ class Node extends _BaseNode {
 
 			// If it's a date or datetime type and the value is a python type
 			if($this->_type == 'date' && $value instanceof \DateTime) {
-				$value = $value.format('Y-m-d');
+				$value = $value->format('Y-m-d');
 			}
 
 			else if($this->_type == 'datetime' && $value instanceof \DateTime) {
-				$value = $value.format('Y-m-d H:i:s');
+				$value = $value->format('Y-m-d H:i:s');
 			}
 
 			// If it's a time type and the value is a python type
 			else if($this->_type == 'time' && $value instanceof \DateTime) {
-				$value = $value.format('H:i:s');
+				$value = $value->format('H:i:s');
 			}
 
 			// If the value is not a string
@@ -1670,7 +1736,7 @@ class Node extends _BaseNode {
 			}
 
 			// If there's no match
-			if(!preg_match($_typeToRegex[$this->_type], $value)) {
+			if(!preg_match(_Types::$regex[$this->_type], $value)) {
 				$this->validation_failures[] = array(implode('.', $level), 'failed regex (internal)');
 				return false;
 			}
@@ -1713,13 +1779,13 @@ class Node extends _BaseNode {
 
 				// And it's a valid representation of an int
 				if(is_string($value) &&
-					preg_match($_typeToRegex['int'], $value)) {
+					preg_match(_Types::$regex['int'], $value)) {
 
 					// If it starts with 0
 					if($value[0] == '0' && strlen($value) > 1) {
 
 						// If it's followed by X or x, it's hex
-						if(in_array($value[1], array('x', 'X') && strlen($value) > 2)) {
+						if(in_array($value[1], array('x', 'X')) && strlen($value) > 2) {
 							$value = intval($value, 16);
 						}
 
@@ -1737,7 +1803,7 @@ class Node extends _BaseNode {
 
 				// Else, return false
 				else {
-					$this->validation_failures[] = array(implode('.', level), 'not an integer');
+					$this->validation_failures[] = array(implode('.', $level), 'not an integer');
 					return false;
 				}
 			}
@@ -1747,7 +1813,7 @@ class Node extends _BaseNode {
 
 				// If the value is below 0
 				if($value < 0) {
-					$this->validation_failures[] = array(implode('.', level), 'signed');
+					$this->validation_failures[] = array(implode('.', $level), 'signed');
 					return false;
 				}
 			}
@@ -1757,7 +1823,7 @@ class Node extends _BaseNode {
 		else if($this->_type == 'bool') {
 
 			// If it's already a bool
-			if(is_bool($value, bool)) {
+			if(is_bool($value)) {
 				return true;
 			}
 
@@ -1804,7 +1870,7 @@ class Node extends _BaseNode {
 			else if(is_string($value)) {
 
 				// If the format is wrong
-				if(!preg_match($_typeToRegex['decimal'], $value)) {
+				if(!preg_match(_Types::$regex['decimal'], $value)) {
 					$this->validation_failures[] = array(implode('.', $level), 'failed regex (internal)');
 					return false;
 				}
@@ -1823,7 +1889,7 @@ class Node extends _BaseNode {
 				foreach($this->_options as $d) {
 
 					// If they match, return OK
-					if(bccomp($value, $d) == 0) {
+					if(bccomp($value, $d, 17) == 0) {
 						return true;
 					}
 				}
@@ -1833,13 +1899,13 @@ class Node extends _BaseNode {
 			else if($this->_minimum != null || $this->_maximum != null) {
 
 				// If there's a minimum and we don't reach it
-				if($this->_minimum != null && bccomp($value, $this->_minimum) == -1) {
+				if($this->_minimum != null && bccomp($value, $this->_minimum, 17) == -1) {
 					$this->validation_failures[] = array(implode('.', $level), 'not long enough');
 					return false;
 				}
 
 				// If there's a maximum and we surpass it
-				if($this->_maximum != null && bccomp($value, $this->_maximum) == 1) {
+				if($this->_maximum != null && bccomp($value, $this->_maximum, 17) == 1) {
 					$this->validation_failures[] = array(implode('.', $level), 'too long');
 					return false;
 				}
@@ -1865,7 +1931,7 @@ class Node extends _BaseNode {
 
 			// If it's an int or a valid representation of a float
 			else if(is_int($value) ||
-				(is_string($value) && preg_match($_typeToRegex['float'], $value))) {
+				(is_string($value) && preg_match(_Types::$regex['decimal'], $value))) {
 				$value = floatval($value);
 			}
 
@@ -1883,7 +1949,7 @@ class Node extends _BaseNode {
 			if(is_string($value)) {
 
 				// Try to decode it
-				if(json_decode($value) == null) {
+				if(json_decode($value) === null) {
 					$this->validation_failures[] = array(implode('.', $level), 'Can not be decoded from JSON');
 					return false;
 				}
@@ -1893,7 +1959,7 @@ class Node extends _BaseNode {
 			else {
 
 				// Try to encode it
-				if(json_encode($value) == false) {
+				if(json_encode($value) === false) {
 					$this->validation_failures[] = array(implode('.', $level), 'Can not be encoded to JSON');
 					return false;
 				}
@@ -1916,8 +1982,7 @@ class Node extends _BaseNode {
 				$value = strval($value);
 
 				// If it has too many decimal places
-				preg_match($_typeToRegex['price'], $value, $aMatches);
-				if(isset($aMatches[1]) && strlen($aMatches[1] > 2)) {
+				if(!preg_match(_Types::$regex['price'], $value, $aMatches)) {
 					$this->validation_failures[] = array(implode('.', $level), 'too many decimal points');
 					return false;
 				}
@@ -1932,7 +1997,7 @@ class Node extends _BaseNode {
 			else if(is_string($value)) {
 
 				// If the format is wrong
-				if(!preg_match($_typeToRegex['decimal'], $value)) {
+				if(!preg_match(_Types::$regex['price'], $value)) {
 					$this->validation_failures[] = array(implode('.', $level), 'failed regex (internal)');
 					return false;
 				}
@@ -1951,7 +2016,7 @@ class Node extends _BaseNode {
 				foreach($this->_options as $d) {
 
 					// If they match, return OK
-					if(bccomp($value, $d) == 0) {
+					if(bccomp($value, $d, 17) == 0) {
 						return true;
 					}
 				}
@@ -1961,13 +2026,13 @@ class Node extends _BaseNode {
 			else if($this->_minimum != null || $this->_maximum != null) {
 
 				// If there's a minimum and we don't reach it
-				if($this->_minimum != null && bccomp($value, $this->_minimum) == -1) {
+				if($this->_minimum != null && bccomp($value, $this->_minimum, 17) == -1) {
 					$this->validation_failures[] = array(implode('.', $level), 'not long enough');
 					return false;
 				}
 
 				// If there's a maximum and we surpass it
-				if($this->_maximum != null && bccomp($value, $this->_maximum) == 1) {
+				if($this->_maximum != null && bccomp($value, $this->_maximum, 17) == 1) {
 					$this->validation_failures[] = array(implode('.', $level), 'too long');
 					return false;
 				}
@@ -1997,7 +2062,7 @@ class Node extends _BaseNode {
 			}
 
 			// Else
-			else if($this->_minimum != null or $this->_maximum != null) {
+			else if($this->_minimum != null || $this->_maximum != null) {
 
 				// If there's a minimum length and we don't reach it
 				if($this->_minimum != null && strlen($value) < $this->_minimum) {
@@ -2017,16 +2082,17 @@ class Node extends _BaseNode {
 		}
 
 		// If there's a list of options
-		if($this->_options) {
+		if($this->_options != null) {
 
 			// Returns based on the option's existance
-			if(!in_array($value, $this->_options)) {
-				$this->validation_failures[] = array(implode('.', $level), 'not in options');
-				return false;
+			for($i = 0; $i < count($this->_options); ++$i) {
+				if($value === $this->_options[$i]) {
+					return true;
+				}
 			}
-			else {
-				return true;
-			}
+
+			$this->validation_failures[] = array(implode('.', $level), 'not in options');
+			return false;
 		}
 
 		// Else check for basic min/max
@@ -2093,7 +2159,7 @@ class OptionsNode implements _NodeInterface {
 
 		// If details is not a true array
 		if(!isset($details[0])) {
-			throw Exception('details in OptionsNode must be an array (not associative)');
+			throw new \Exception('details in OptionsNode must be an array (not associative)');
 		}
 
 		// Init the variable used to identify the last falures in validation
@@ -2124,12 +2190,12 @@ class OptionsNode implements _NodeInterface {
 
 			// Whatever was sent is invalid
 			else {
-				throw Exception('details[' . $i .'] in OptionsNode must be an array');
+				throw new \Exception('details[' . $i .'] in OptionsNode must be an array');
 			}
 
 			// If the element is not optional, then the entire object can't be
 			//	optional
-			if(!$this->_nodes[$i]->_optional) {
+			if(!$this->_nodes[$i]->optional()) {
 				$this->_optional = false;
 			}
 		}
@@ -2163,7 +2229,7 @@ class OptionsNode implements _NodeInterface {
 	public function clean($value) {
 
 		// If the value is null and it's optional, return as is
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return null;
 		}
 
@@ -2171,15 +2237,15 @@ class OptionsNode implements _NodeInterface {
 		for($i = 0; $i < count($this->_nodes); ++$i) {
 
 			// If it's valid
-			if($this->_nodes[$i].valid($value)) {
+			if($this->_nodes[$i]->valid($value)) {
 
 				// Use its clean
-				return $this->_nodes[$i].clean($value);
+				return $this->_nodes[$i]->clean($value);
 			}
 		}
 
 		// Something went wrong
-		throw Exception('invalid value');
+		throw new \Exception('invalid value');
 	}
 
 	/**
@@ -2252,21 +2318,26 @@ class OptionsNode implements _NodeInterface {
 	 * @param mixed $value				The value to validate
 	 * @return bool
 	 */
-	public function valid($value, array $level = array()) {
+	public function valid($value, $level = array()) {
 
 		// Reset validation failures
 		$this->validation_failures = array();
 
 		// If the value is null and it's optional, we're good
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return true;
+		}
+
+		// If the level is not an array
+		if(!is_array($level)) {
+			throw new \Exception('level');
 		}
 
 		// Go through each of the nodes
 		for($i = 0; $i < count($this->_nodes); ++$i) {
 
 			// If it's valid
-			if($this->_nodes[$i].valid($value)) {
+			if($this->_nodes[$i]->valid($value)) {
 				return true;
 			}
 		}
@@ -2285,7 +2356,7 @@ class OptionsNode implements _NodeInterface {
  *
  * @extends _BaseNode
  */
-class ParentNode extends _BaseNode {
+class ParentNode extends _BaseNode implements \ArrayAccess {
 
 	/**
 	 * Associative array of keys to _NodeInterface
@@ -2312,6 +2383,9 @@ class ParentNode extends _BaseNode {
 	 */
 	public function __construct(array $details) {
 
+		// Call the parent constructor
+		parent::__construct($details, 'Parent');
+
 		// Init the nodes and requires arrays
 		$this->_nodes = array();
 		$this->_requires = array();
@@ -2320,7 +2394,7 @@ class ParentNode extends _BaseNode {
 		foreach($details as $k => $v) {
 
 			// If key is standard
-			if(preg_match($_standardField, $k)) {
+			if(preg_match(_Types::$standard, $k)) {
 
 				// If it's a Node
 				if($v instanceof _NodeInterface) {
@@ -2333,48 +2407,13 @@ class ParentNode extends _BaseNode {
 				else {
 					$this->_nodes[$k] = _child($v);
 				}
-
-				// Remove the key from the details
-				unset($details[$k]);
 			}
 		}
 
 		// If there's a require hash available
 		if(isset($details['__require__'])) {
 			$this->requires($details['__require__']);
-			unset($details['__require__']);
 		}
-
-		// Call the parent constructor with whatever details are left
-		parent::__construct($details, 'Parent');
-	}
-
-	/**
-	 * __isset
-	 *
-	 * Returns if the key exists in the Parent
-	 *
-	 * @name __isset
-	 * @access public
-	 * @param string $k					The key to check for in the Parent
-	 * @return bool
-	 */
-	public function __isset($k) {
-		return isset($this->_nodes[$k]);
-	}
-
-	/**
-	 * __get
-	 *
-	 * Returns the Node at the given key
-	 *
-	 * @name __get
-	 * @access public
-	 * @param string $k					The key to return the Node at in the Parent
-	 * @return _NodeInterface
-	 */
-	public function &__get($k) {
-		return $this->_nodes[$k];
 	}
 
 	/**
@@ -2392,13 +2431,13 @@ class ParentNode extends _BaseNode {
 	public function clean($value) {
 
 		// If the value is null and it's optional, return as is
-		if($value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return null;
 		}
 
 		// If the value is not a dict
 		if(!is_array($value)) {
-			throw Exception('value');
+			throw new \Exception('value');
 		}
 
 		// Init the return value
@@ -2409,11 +2448,11 @@ class ParentNode extends _BaseNode {
 
 			// If the key doesn't exist
 			if(!isset($this->_nodes[$k])) {
-				throw Exception(strval($k) . ' is not a valid node in the parent');
+				throw new \Exception(strval($k) . ' is not a valid node in the parent');
 			}
 
 			// Clean the value
-			$aRet[$k] = $this->_nodes[$k].clean($value[$k]);
+			$aRet[$k] = $this->_nodes[$k]->clean($value[$k]);
 		}
 
 		// Return the cleaned values
@@ -2464,15 +2503,52 @@ class ParentNode extends _BaseNode {
 	}
 
 	/**
+	 * Offset Exists (magic method)
+	 *
+	 * Returns if the key exists in the Parent
+	 *
+	 * @name offsetExists
+	 * @access public
+	 * @param string $k					The key to check for in the Parent
+	 * @return bool
+	 */
+	public function offsetExists($k) {
+		return isset($this->_nodes[$k]);
+	}
+
+	/**
+	 * Offset Get (magic method)
+	 *
+	 * Returns the Node at the given key
+	 *
+	 * @name offsetGet
+	 * @access public
+	 * @param string $k					The key to return the Node at in the Parent
+	 * @return _NodeInterface
+	 */
+	public function offsetGet($k) {
+		return $this->_nodes[$k];
+	}
+
+	public function offsetSet($k, $v) {
+		throw new \Exception('Not allowed to set Parent key');
+	}
+
+	public function offsetUnset($k) {
+		throw new \Exception('Not allowed to unset Parent key');
+	}
+
+	/**
 	 * Requires
 	 *
 	 * Sets or gets the require rules used to validate the Parent
 	 *
 	 * @name requires
-	 * @param  array  $require [description]
-	 * @return [type]          [description]
+	 * @access public
+	 * @param array $require			An array of fields to fields it requires
+	 * @return array | void
 	 */
-	protected function requires($require = null) {
+	public function requires($require = null) {
 
 		// If require is null, this is a getter
 		if($require == null) {
@@ -2481,7 +2557,7 @@ class ParentNode extends _BaseNode {
 
 		// If it's not a valid array
 		if(!is_array($require)) {
-			throw Exception('__require__');
+			throw new \Exception('__require__');
 		}
 
 		// Go through each key and make sure it goes with a field
@@ -2489,7 +2565,7 @@ class ParentNode extends _BaseNode {
 
 			// If the field doesn't exist
 			if(!isset($this->_nodes[$k])) {
-				throw Exception('__require__[' . strval($k) . ']');
+				throw new \Exception('__require__[' . strval($k) . ']');
 			}
 
 			// If the value is a string
@@ -2499,13 +2575,13 @@ class ParentNode extends _BaseNode {
 
 			// Else if it's not a non-associative array
 			else if(!is_array($v) || !isset($v[0])) {
-				throw Exception('__require__[' . strval($k) . ']');
+				throw new \Exception('__require__[' . strval($k) . ']');
 			}
 
 			// Make sure each required field also exists
 			for($i = 0; $i < count($v); ++$i) {
 				if(!isset($this->_nodes[$v[$i]])) {
-					throw Exception('__require__[' . strval($k) . ']: ' . implode(',', $v));
+					throw new \Exception('__require__[' . strval($k) . ']: ' . implode(',', $v));
 				}
 			}
 
@@ -2531,7 +2607,7 @@ class ParentNode extends _BaseNode {
 
 		// Go through each field and add it to the return
 		foreach($this->_nodes as $k => $v) {
-			$aRet[$k] = $v.toArray();
+			$aRet[$k] = $v->toArray();
 		}
 
 		// Return
@@ -2548,19 +2624,24 @@ class ParentNode extends _BaseNode {
 	 * @param array $value				The value to validate
 	 * @return bool
 	 */
-	public function valid($value, array $level = array()) {
+	public function valid($value, $level = array()) {
 
 		// Reset validation failures
 		$this->validation_failures = array();
 
 		// If the value is null and it's optional, we're good
-		if(value == null && $this->_optional) {
+		if(is_null($value) && $this->_optional) {
 			return true;
+		}
+
+		// If the level is not an array
+		if(!is_array($level)) {
+			throw new \Exception('level');
 		}
 
 		// If the value isn't a dictionary
 		if(!is_array($value)) {
-			$this->validation_failures[] = array(implode('.', $level), strval(value));
+			$this->validation_failures[] = array(implode('.', $level), strval($value));
 			return false;
 		}
 
@@ -2614,5 +2695,102 @@ class ParentNode extends _BaseNode {
 
 		// Return whatever the result was
 		return $bRet;
+	}
+}
+
+/**
+ * Tree class
+ *
+ * Represents the master parent of a record, holds special data to represent
+ * how the entire tree is stored
+ *
+ * @extends ParentNode
+ */
+class Tree extends ParentNode {
+
+	/**
+	 * The name of the tree
+	 * @var string
+	 */
+	protected $_name;
+
+	/**
+	 * Constructor
+	 *
+	 * Initialises the instance
+	 *
+	 * @name Tree
+	 * @access public
+	 * @throws Exception
+	 * @param array $details			Details describing the type of values allowed for the nodes
+	 * @return Tree
+	 */
+	public function __construct(array $details) {
+
+		// If the name is not set
+		if(!isset($details['__name__'])) {
+			throw new \Exception('"__name__" not found in details');
+		}
+
+		// If the name is not valid
+		if(!preg_match(_Types::$standard, $details['__name__'])) {
+			throw new \Exception('"__name__" not a valid value for Tree');
+		}
+
+		// If for some reason the array flag is set, remove it
+		if(isset($details['__array__'])) {
+			unset($details['__array__']);
+		}
+
+		// Call the parent constructor
+		parent::__construct($details);
+
+		// Store the name then delete it
+		$this->_name = $details['__name__'];
+
+		// Overwrite classname
+		$this->_class = 'Tree';
+	}
+
+	/**
+	 * To Array
+	 *
+	 * Returns the Tree as an array in the same format as is used in
+	 * constructing it
+	 *
+	 * @name toArray
+	 * @access public
+	 * @return array
+	 */
+	public function toArray() {
+
+		// Merge the initial array with the name to the parent and return
+		return array_merge(
+			array('__name__' => $this->_name),
+			parent::toArray()
+		);
+	}
+
+	/**
+	 * Valid
+	 *
+	 * Checks if a value is valid based on the instances values
+	 *
+	 * @name valid
+	 * @access public
+	 * @param array $value				The value to validate
+	 * @param bool $include_name		If true, Tree's name will be prepended to all error keys
+	 * @return bool
+	 */
+	public function valid($value, $include_name = true) {
+
+		// Include name?
+		$aLevel = array();
+		if($include_name) {
+			$aLevel[] = $this->_name;
+		}
+
+		// Call the parent valid method and return the result
+		return parent::valid($value, $aLevel);
 	}
 }
