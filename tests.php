@@ -1060,7 +1060,7 @@ class FormatTest extends TestCase {
 		// Create a new options any Node module
 		$oNode = new FormatOC\Node(array(
 			'__type__' => 'string',
-			'__regex__' => '/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/'
+			'__regex__' => '^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$'
 		));
 
 		// Check for True
@@ -1079,7 +1079,7 @@ class FormatTest extends TestCase {
 		// Create a new options any Node module
 		$oNode = new FormatOC\Node(array(
 			'__type__' => 'string',
-			'__regex__' => '/^(?:hello|there|my|friend)$/'
+			'__regex__' => '^(?:hello|there|my|friend)$'
 		));
 
 		// Check for True
@@ -1134,17 +1134,17 @@ class FormatTest extends TestCase {
 
 	public function test_Tree_toJSON() {
 
-		$o = new FormatOC\Tree(array("__name__"=>"hello","field1"=>array("__type__"=>"uint"),"field2"=>array("field2_1"=>array("__type__"=>"string","__regex__"=>'/^\S+$/'),"field2_2"=>array("__type__"=>"uint","__options__"=>array(0,1,2,34))),"field3"=>array("__array__"=>"unique","__type__"=>"decimal"),"field4"=>array("__array__"=>"duplicates","__ui__"=>array("ui"=>"information"),"field4_1"=>array("__type__"=>"md5"),"field4_2"=>array("field4_2_1"=>array("__type__"=>"date","__mysql__"=>"MySQL information")))));
+		$o = new FormatOC\Tree(array("__name__"=>"hello","field1"=>array("__type__"=>"uint"),"field2"=>array("field2_1"=>array("__type__"=>"string","__regex__"=>'^\S+$'),"field2_2"=>array("__type__"=>"uint","__options__"=>array(0,1,2,34))),"field3"=>array("__array__"=>"unique","__type__"=>"decimal"),"field4"=>array("__array__"=>"duplicates","__ui__"=>array("ui"=>"information"),"field4_1"=>array("__type__"=>"md5"),"field4_2"=>array("field4_2_1"=>array("__type__"=>"date","__mysql__"=>"MySQL information")))));
 
 		// Test for true
-		$json = '{"__name__":"hello","field1":{"__type__":"uint"},"field2":{"field2_1":{"__type__":"string","__regex__":"\/^\\\\S+$\/"},"field2_2":{"__type__":"uint","__options__":[0,1,2,34]}},"field3":{"__array__":"unique","__type__":"decimal"},"field4":{"__array__":"duplicates","__ui__":{"ui":"information"},"field4_1":{"__type__":"md5"},"field4_2":{"field4_2_1":{"__mysql__":"MySQL information","__type__":"date"}}}}';
+		$json = '{"__name__":"hello","field1":{"__type__":"uint"},"field2":{"field2_1":{"__type__":"string","__regex__":"^\\\\S+$"},"field2_2":{"__type__":"uint","__options__":[0,1,2,34]}},"field3":{"__array__":"unique","__type__":"decimal"},"field4":{"__array__":"duplicates","__ui__":{"ui":"information"},"field4_1":{"__type__":"md5"},"field4_2":{"field4_2_1":{"__mysql__":"MySQL information","__type__":"date"}}}}';
 		$this->assertTrue($o->toJSON() == $json, 'toJSON failed: ' . $o->toJSON());
 	}
 
 	public function test_Tree_Valid() {
 
 		// Build a Tree
-		$o = new FormatOC\Tree(array("__name__"=>"hello","field1"=>array("__type__"=>"uint"),"field2"=>array("field2_1"=>array("__type__"=>"string","__regex__"=>"/^\\S+$/"),"field2_2"=>array("__type__"=>"uint","__options__"=>array(0,1,2,34))),"field3"=>array("__array__"=>"unique","__type__"=>"decimal"),"field4"=>array("__array__"=>"duplicates","field4_1"=>array("__type__"=>"md5"),"field4_2"=>array("field4_2_1"=>array("__type__"=>"date")))));
+		$o = new FormatOC\Tree(array("__name__"=>"hello","field1"=>array("__type__"=>"uint"),"field2"=>array("field2_1"=>array("__type__"=>"string","__regex__"=>"^\\S+$"),"field2_2"=>array("__type__"=>"uint","__options__"=>array(0,1,2,34))),"field3"=>array("__array__"=>"unique","__type__"=>"decimal"),"field4"=>array("__array__"=>"duplicates","field4_1"=>array("__type__"=>"md5"),"field4_2"=>array("field4_2_1"=>array("__type__"=>"date")))));
 
 		// Check for True
 		$this->assertTrue($o['field2']['field2_1']->valid('Hello'), '"Hello" is not a valid value for hello.field2.field2_1');
