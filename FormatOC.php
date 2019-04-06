@@ -1023,7 +1023,7 @@ class Node extends _BaseNode {
 
 		// If there's a regex string available
 		if(isset($details['__regex__'])) {
-			$this->regex($details['__regex__']);
+			$this->regex('/' . $details['__regex__'] . '/');
 		}
 
 		// Else if there's a list of options
