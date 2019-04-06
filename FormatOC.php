@@ -6,6 +6,7 @@
  *
  * @author Chris Nasr
  * @copyright OurobotosCoding
+ * @version 1.5.2
  * @created 2016-02-20
  */
 
@@ -520,6 +521,51 @@ class ArrayNode extends _BaseNode {
 	}
 
 	/**
+	 * Child
+	 *
+	 * Returns the child node associated with the array
+	 *
+	 * @name child
+	 * @access public
+	 * @return object
+	 */
+	public function child() {
+		return $this->_node;
+	}
+
+	/**
+	 * Clean
+	 *
+	 * Goes through each of the values in the list, cleans it, stores it, and
+	 * returns a new list
+	 *
+	 * @name clean
+	 * @access public
+	 * @throws Exception
+	 * @param array $value				The value to clean
+	 * @return array
+	 */
+	public function clean($value) {
+
+		// If the value is null and it's optional, return as is
+		if(is_null($value) && $this->_optional) {
+			return null;
+		}
+
+		// If the value is not an array
+		if(!is_array($value)) {
+			throw new \Exception('value');
+		}
+
+		// Recurse and return it
+		$aRet = array();
+		for($i = 0; $i < count($value); ++$i) {
+			$aRet[] = $this->_node->clean($value[$i]);
+		}
+		return $aRet;
+	}
+
+	/**
 	 * Min/Max
 	 *
 	 * Sets or gets the minimum and maximum number of items for the Array
@@ -600,38 +646,6 @@ class ArrayNode extends _BaseNode {
 			// Store the maximum
 			$this->_maximum = $maximum;
 		}
-	}
-
-	/**
-	 * Clean
-	 *
-	 * Goes through each of the values in the list, cleans it, stores it, and
-	 * returns a new list
-	 *
-	 * @name clean
-	 * @access public
-	 * @throws Exception
-	 * @param array $value				The value to clean
-	 * @return array
-	 */
-	public function clean($value) {
-
-		// If the value is null and it's optional, return as is
-		if(is_null($value) && $this->_optional) {
-			return null;
-		}
-
-		// If the value is not an array
-		if(!is_array($value)) {
-			throw new \Exception('value');
-		}
-
-		// Recurse and return it
-		$aRet = array();
-		for($i = 0; $i < count($value); ++$i) {
-			$aRet[] = $this->_node->clean($value[$i]);
-		}
-		return $aRet;
 	}
 
 	/**
@@ -819,6 +833,19 @@ class HashNode extends _BaseNode {
 
 		// Store the child
 		$this->_node = _child($details);
+	}
+
+	/**
+	 * Child
+	 *
+	 * Returns the child node associated with the hash
+	 *
+	 * @name child
+	 * @access public
+	 * @return object
+	 */
+	public function child() {
+		return $this->_node;
 	}
 
 	/**
@@ -1647,7 +1674,7 @@ class Node extends _BaseNode {
 
 		// If there's a regex
 		if(!is_null($this->_regex)) {
-			$aRet['__regex__'] = $this->_regex;
+			$aRet['__regex__'] = substr($this->_regex, 1, -1);
 		}
 
 		// If there are options
