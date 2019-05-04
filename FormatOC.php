@@ -6,7 +6,7 @@
  *
  * @author Chris Nasr
  * @copyright OurobotosCoding
- * @version 1.5.3
+ * @version 1.5.5
  * @created 2016-02-20
  */
 
@@ -41,7 +41,7 @@ abstract class _Types {
 	 * Holds a regex to match any standard named fields. These are limited in order
 	 * to ease the ability to plugin additional data stores
 	 */
-	public static $standard = '/^_?[a-zA-Z0-9][a-zA-Z0-9_]*$/';
+	public static $standard = '/^_?[a-zA-Z0-9][a-zA-Z0-9_-]*$/';
 
 	/**
 	 * Type to Regex
