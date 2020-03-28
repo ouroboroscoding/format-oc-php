@@ -6,7 +6,7 @@
  *
  * @author Chris Nasr
  * @copyright OurobotosCoding
- * @version 1.5.5
+ * @version 1.5.7
  * @created 2016-02-20
  */
 
@@ -58,7 +58,8 @@ abstract class _Types {
 		'md5'		=> '/^[a-fA-F0-9]{32}$/',
 		'price'		=> '/^-?(?:[1-9]\d+|\d)(?:\.(\d{1,2}))?$/',
 		'time'		=> '/^(?:[01]\d|2[0-3])(?::[0-5]\d){2}$/',
-		'uuid'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/'
+		'uuid'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/',
+		'uuid4'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/'
 	);
 }
 
@@ -1003,7 +1004,7 @@ class Node extends _BaseNode {
 	protected static $_VALID_TYPES = array(
 		'any', 'base64', 'bool', 'date', 'datetime', 'decimal',
 		'float', 'int', 'ip', 'json', 'md5', 'price', 'string',
-		'time', 'timestamp', 'uint', 'uuid');
+		'time', 'timestamp', 'uint', 'uuid', 'uuid4');
 
 	/**
 	 * Constructor
@@ -1098,7 +1099,7 @@ class Node extends _BaseNode {
 		}
 
 		// Else if it's a basic string type
-		else if(in_array($this->_type, array('base64', 'ip', 'string', 'uuid'))) {
+		else if(in_array($this->_type, array('base64', 'ip', 'string', 'uuid', 'uuid4'))) {
 
 			// And not already a string
 			if(!is_string($value)) {
@@ -1516,7 +1517,7 @@ class Node extends _BaseNode {
 		if(!in_array($this->_type, array(
 				'base64', 'date', 'datetime', 'decimal', 'float',
 				'int', 'ip', 'md5', 'price', 'string', 'time',
-				'timestamp', 'uint', 'uuid'))) {
+				'timestamp', 'uint', 'uuid', 'uuid4'))) {
 			throw new \Exception('can not set __options__ for ' . $this->_type);
 		}
 
@@ -1528,7 +1529,7 @@ class Node extends _BaseNode {
 
 			// Convert the value based on the type
 			// If the type is a string one that we can validate
-			if(in_array($this->_type, array('base64', 'date', 'datetime', 'ip', 'md5', 'time', 'uuid'))) {
+			if(in_array($this->_type, array('base64', 'date', 'datetime', 'ip', 'md5', 'time', 'uuid', 'uuid4'))) {
 
 				// If the value is not a string or doesn't match its regex, throw
 				//	an error
@@ -1740,7 +1741,7 @@ class Node extends _BaseNode {
 		}
 
 		// If we are validating a DATE, DATETIME, IP or TIME data point
-		else if(in_array($this->_type, array('base64', 'date', 'datetime', 'ip', 'md5', 'time', 'uuid'))) {
+		else if(in_array($this->_type, array('base64', 'date', 'datetime', 'ip', 'md5', 'time', 'uuid', 'uuid4'))) {
 
 			// If it's a date or datetime type and the value is a python type
 			if($this->_type == 'date' && $value instanceof \DateTime) {
