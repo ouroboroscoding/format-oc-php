@@ -6,7 +6,7 @@
  *
  * @author Chris Nasr
  * @copyright OurobotosCoding
- * @version 1.5.7
+ * @version 1.5.11
  * @created 2016-02-20
  */
 
@@ -1310,7 +1310,7 @@ class Node extends _BaseNode {
 
 			// Else if the type is an int (unsigned, timestamp), or a string in
 			// 	which the min/max are lengths
-			else if(in_array($this->_type, array('int', 'string', 'timestamp', 'uint'))) {
+			else if(in_array($this->_type, array('base64', 'int', 'string', 'timestamp', 'uint'))) {
 
 				// If the value is not a valid int or long
 				if(!is_int($minimum)) {
@@ -1329,7 +1329,7 @@ class Node extends _BaseNode {
 					}
 
 					// If the type is meant to be unsigned
-					if(in_array($this->_type, array('string', 'timestamp', 'uint'))) {
+					if(in_array($this->_type, array('base64', 'string', 'timestamp', 'uint'))) {
 
 						// And it's below zero
 						if($minimum < 0) {
@@ -1396,7 +1396,7 @@ class Node extends _BaseNode {
 
 			// Else if the type is an int (unsigned, timestamp), or a string in
 			// 	which the min/max are lengths
-			else if(in_array($this->_type, array('int', 'string', 'timestamp', 'uint'))) {
+			else if(in_array($this->_type, array('base64', 'int', 'string', 'timestamp', 'uint'))) {
 
 				// If the value is not a valid int or long
 				if(!is_int($maximum)) {
@@ -1415,7 +1415,7 @@ class Node extends _BaseNode {
 					}
 
 					// If the type is meant to be unsigned
-					if(in_array($this->_type, array('string', 'timestamp', 'uint'))) {
+					if(in_array($this->_type, array('base64', 'string', 'timestamp', 'uint'))) {
 
 						// And it's below zero
 						if($maximum < 0) {
