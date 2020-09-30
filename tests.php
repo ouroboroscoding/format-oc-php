@@ -501,6 +501,7 @@ class FormatTest extends TestCase {
 		$this->assertTrue($oNode->valid('255.255.255.255'), '"255.255.255.255" is not a valid ip');
 		$this->assertTrue($oNode->valid('8.8.8.8'), '"8.8.8.8" is not a valid ip');
 		$this->assertTrue($oNode->valid('66.36.159.171'), '"66.36.159.171" is not a valid ip');
+		$this->assertTrue($oNode->valid('255.255.255.0'), '"255.255.255.0" is not a valid ip');
 
 		// Check for false
 		$this->assertFalse($oNode->valid('Hello'), '"Hello" is a valid ip');
@@ -777,6 +778,7 @@ class FormatTest extends TestCase {
 		));
 
 		// Check for True
+		$this->assertTrue($oNode->valid('192.168.1.0'), '"192.168.1.0" is not between "192.168.0.1" and "192.168.1.1"');
 		$this->assertTrue($oNode->valid('192.168.0.1'), '"192.168.0.1" is not between "192.168.0.1" and "192.168.1.1"');
 		$this->assertTrue($oNode->valid('192.168.1.1'), '"192.168.1.1" is not between "192.168.0.1" and "192.168.1.1"');
 		$this->assertTrue($oNode->valid('192.168.0.246'), '"192.168.0.246" is not between "192.168.0.1" and "192.168.1.1"');
@@ -785,7 +787,6 @@ class FormatTest extends TestCase {
 		// Check for False
 		$this->assertFalse($oNode->valid('192.169.0.1'), '"192.169.0.1" is between "192.168.0.1" and "192.168.1.1"');
 		$this->assertFalse($oNode->valid('193.168.0.1'), '"193.168.0.1" is between "192.168.0.1" and "192.168.1.1"');
-		$this->assertFalse($oNode->valid('192.168.1.0'), '"192.168.1.0" is between "192.168.0.1" and "192.168.1.1"');
 		$this->assertFalse($oNode->valid('192.0.0.1'), '"192.0.0.1" is between "192.168.0.1" and "192.168.1.1"');
 
 		// Create a new minmax string Node module
