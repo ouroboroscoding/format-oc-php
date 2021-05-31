@@ -5,7 +5,7 @@
  * Contains several classes used to represent documents and their nodes
  *
  * @author Chris Nasr
- * @copyright OurobotosCoding
+ * @copyright OuroborosCoding
  * @version 1.5.12
  * @created 2016-02-20
  */
