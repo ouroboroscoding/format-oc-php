@@ -1111,6 +1111,25 @@ class FormatTest extends TestCase {
 		$this->assertTrue($oOption->clean('there') == 'there', '"hello" does not equal "there"');
 	}
 
+	public function test_Option_Iterate() {
+
+		$a = array(
+			array("__type__" => "uint"),
+			array("__type__" => "string","__options__" => array("hello", "there"))
+		);
+
+		$oOption = new FormatOC\OptionsNode(array(
+			array("__type__" => "uint"),
+			array("__type__" => "string","__options__" => array("hello", "there"))
+		));
+
+		$this->assertTrue(count($oOption) == 2, 'Count is not 2');
+
+		for($i = 0; $i < count($oOption); ++$i) {
+			$this->assertTrue($oOption[$i]->toArray() == $a[$i], 'structure doesn\'t match');
+		}
+	}
+
 	public function test_Option_Valid() {
 
 		$oOption = new FormatOC\OptionsNode(array(
