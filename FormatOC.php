@@ -6,7 +6,7 @@
  *
  * @author Chris Nasr
  * @copyright OuroborosCoding
- * @version 1.5.12
+ * @version 1.5.13
  * @created 2016-02-20
  */
 
@@ -2152,7 +2152,7 @@ class Node extends _BaseNode {
  *
  * @implements _NodeInterface
  */
-class OptionsNode implements _NodeInterface {
+class OptionsNode implements _NodeInterface, \ArrayAccess, \Countable {
 
 	/**
 	 * List of valid Nodes
@@ -2277,6 +2277,19 @@ class OptionsNode implements _NodeInterface {
 	}
 
 	/**
+	 * Count
+	 * 
+	 * Returns the number of options available
+	 * 
+	 * @name count
+	 * @access public
+	 * @return uint
+	 */
+	public function count() {
+		return count($this->_nodes);
+	}
+
+	/**
 	 * From File
 	 *
 	 * Loads a JSON file and creates an OptionsNode instance from it
@@ -2297,6 +2310,42 @@ class OptionsNode implements _NodeInterface {
 
 		// Create and return the new instance
 		return new self($details);
+	}
+
+	/**
+	 * Offset Exists (magic method)
+	 *
+	 * Returns if the index exists in the options
+	 *
+	 * @name offsetExists
+	 * @access public
+	 * @param uint $i					The index to check for in the options
+	 * @return bool
+	 */
+	public function offsetExists($i) {
+		return $i < count($this._nodes);
+	}
+
+	/**
+	 * Offset Get (magic method)
+	 *
+	 * Returns the Node at the given index
+	 *
+	 * @name offsetGet
+	 * @access public
+	 * @param string $i					The index to return the Node at in the options
+	 * @return _NodeInterface
+	 */
+	public function offsetGet($i) {
+		return $this->_nodes[$i];
+	}
+
+	public function offsetSet($k, $v) {
+		throw new \Exception('Not allowed to set OptionsNode index');
+	}
+
+	public function offsetUnset($k) {
+		throw new \Exception('Not allowed to unset OptionsNode index');
 	}
 
 	/**
