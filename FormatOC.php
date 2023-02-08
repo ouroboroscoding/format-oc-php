@@ -6,7 +6,7 @@
  *
  * @author Chris Nasr
  * @copyright OuroborosCoding
- * @version 1.5.13
+ * @version 1.6.0
  * @created 2016-02-20
  */
 
@@ -61,6 +61,55 @@ abstract class _Types {
 		'uuid'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/',
 		'uuid4'		=> '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/'
 	);
+}
+
+/**
+ * Node Exception
+ *
+ * Special exception type for issues with invalid Node data
+ *
+ * @name NodeException
+ * @extends Exception
+ */
+class NodeException extends \Exception {
+
+	/**
+	 * Holds the list of errors
+	 * @var string[][]
+	 */
+	public $errors;
+
+	/**
+	 * Constructor
+	 *
+	 * Initialises the instance
+	 *
+	 * @name NodeException
+	 * @access public
+	 * @param array $errors The array of errors
+	 * @param string $message The error message
+	 * @param int $code The error code
+	 * @param Throwable $previous The previous exception
+	 * @return NodeException
+	 */
+	public function __construct($errors, $message='invalid node data', $code=0, Throwable $previous=null) {
+		var_dump($errors);
+		$this->errors = $errors;
+		parent::__construct($message, $code, $previous);
+	}
+
+	/**
+	 * To String
+	 *
+	 * Converts the exception to a string so it can be printed
+	 *
+	 * @name __toString
+	 * @access public
+	 * @return string
+	 */
+	public function __toString() {
+		return 'NodeException: ' . $this.message . "\n" . \var_export($this->errors);
+	}
 }
 
 /**
@@ -177,7 +226,7 @@ function _compare_ips($first, $second) {
  * All Node instances must be built off this set of methods
  */
 interface _NodeInterface {
-	public function clean($value);
+	public function clean($value, $level);
 	public static function fromFile($filename);
 	public function toArray();
 	public function toJSON();
@@ -546,7 +595,7 @@ class ArrayNode extends _BaseNode {
 	 * @param array $value				The value to clean
 	 * @return array
 	 */
-	public function clean($value) {
+	public function clean($value, $level=array()) {
 
 		// If the value is null and it's optional, return as is
 		if(is_null($value) && $this->_optional) {
@@ -555,14 +604,32 @@ class ArrayNode extends _BaseNode {
 
 		// If the value is not an array
 		if(!is_array($value)) {
-			throw new \Exception('value');
+			throw new NodeException(array(array(\implode('.', $level), 'not a valid array')));
 		}
 
-		// Recurse and return it
+		// Go through each value
+		$aErrors = array();
 		$aRet = array();
 		for($i = 0; $i < count($value); ++$i) {
-			$aRet[] = $this->_node->clean($value[$i]);
+
+			// Add the field to the level
+			$aLevel = $level;
+			$aLevel[] = '[' . $i . ']';
+
+			// Try to clean it
+			try {
+				$aRet[] = $this->_node->clean($value[$i], $aLevel);
+			} catch(NodeException $e) {
+				$aErrors = array_merge($aErrors, $e->errors);
+			}
 		}
+
+		// If there's any errors
+		if(count($aErrors)) {
+			throw new NodeException($aErrors);
+		}
+
+		// Return the cleaned array
 		return $aRet;
 	}
 
@@ -739,11 +806,11 @@ class ArrayNode extends _BaseNode {
 		for($i = 0; $i < count($value); ++$i) {
 
 			// Add the field to the level
-			$lLevel = $level;
-			$lLevel[] = '[' . $i . ']';
+			$aLevel = $level;
+			$aLevel[] = '[' . $i . ']';
 
 			// If the element isn't valid, return false
-			if(!$this->_node->valid($value[$i], $lLevel)) {
+			if(!$this->_node->valid($value[$i], $aLevel)) {
 				$this->validation_failures = array_merge($this->validation_failures, $this->_node->validation_failures);
 				$bRet = false;
 				continue;
@@ -754,7 +821,7 @@ class ArrayNode extends _BaseNode {
 
 				// If the value already exists, add the error to the list
 				if(($iIndex = array_search($value[$i], $aItems)) !== false) {
-					$this->validation_failures[] = array(implode('.', $lLevel), 'duplicate of ' . implode('.', $level) . '[' . $iIndex . ']');
+					$this->validation_failures[] = array(implode('.', $aLevel), 'duplicate of ' . implode('.', $level) . '[' . $iIndex . ']');
 					$bRet = false;
 					continue;
 				}
@@ -861,23 +928,41 @@ class HashNode extends _BaseNode {
 	 * @param array $value				The value to clean
 	 * @return array
 	 */
-	public function clean($value) {
+	public function clean($value, $level=array()) {
 
 		// If the value is null and it's optional, return as is
 		if(is_null($value) && $this->_optional) {
 			return null;
 		}
 
-		// If the value is not a dict
+		// If the value is not a object
 		if(!is_array($value)) {
-			throw new \Exception('value');
+			throw new NodeException(array(array(\implode('.', $level), 'not a valid object')));
 		}
 
-		// Recurse and return it
+		# Go through each key
+		$aErrors = array();
 		$aRet = array();
 		foreach($value as $k => $v) {
-			$aRet[$this->_key->clean($k)] = $this->_node->clean($v);
+
+			// Add the field to the level
+			$aLevel = $level;
+			$aLevel[] = $k;
+
+			// Try to clean the values
+			try {
+				$aRet[$this->_key->clean($k)] = $this->_node->clean($v);
+			} catch(NodeException $e) {
+				$aErrors = array_merge($aErrors, $e->errors);
+			}
 		}
+
+		// If there's any errors
+		if(count($aErrors)) {
+			throw new NodeException($aErrors);
+		}
+
+		// Return the cleaned object
 		return $aRet;
 	}
 
@@ -939,18 +1024,18 @@ class HashNode extends _BaseNode {
 		foreach($value as $k => $v) {
 
 			// Add the field to the level
-			$lLevel = $level;
-			$lLevel[] = $k;
+			$aLevel = $level;
+			$aLevel[] = $k;
 
 			// If the key isn't valid
 			if(!$this->_key->valid($k)) {
-				$this->validation_failures[] = array(implode('.', $lLevel), 'invalid key: ' + strval($k));
+				$this->validation_failures[] = array(implode('.', $aLevel), 'invalid key: ' + strval($k));
 				$bRet = false;
 				continue;
 			}
 
 			// Check the value
-			if(!$this->_node->valid($v, $lLevel)) {
+			if(!$this->_node->valid($v, $aLevel)) {
 				$this->validation_failures = array_merge($this->validation_failures, $this->_node->validation_failures);
 				$bRet = false;
 				continue;
@@ -1085,7 +1170,7 @@ class Node extends _BaseNode {
 	 * @param mixed $value				The value to clean
 	 * @return mixed
 	 */
-	public function clean($value) {
+	public function clean($value, $level=null) {
 
 		// If the value is null and it's optional, return as is
 		if(is_null($value) && $this->_optional) {
@@ -2209,7 +2294,7 @@ class OptionsNode implements _NodeInterface, \ArrayAccess, \Countable {
 				continue;
 			}
 
-			// If the element is a dict instance
+			// If the element is an array instance
 			else if(is_array($details[$i])) {
 
 				// Store the child
@@ -2254,7 +2339,7 @@ class OptionsNode implements _NodeInterface, \ArrayAccess, \Countable {
 	 * @param mixed $value				The value to clean
 	 * @return mixed
 	 */
-	public function clean($value) {
+	public function clean($value, $level=array()) {
 
 		// If the value is null and it's optional, return as is
 		if(is_null($value) && $this->_optional) {
@@ -2264,16 +2349,17 @@ class OptionsNode implements _NodeInterface, \ArrayAccess, \Countable {
 		// Go through each of the nodes
 		for($i = 0; $i < count($this->_nodes); ++$i) {
 
+
 			// If it's valid
 			if($this->_nodes[$i]->valid($value)) {
 
 				// Use its clean
-				return $this->_nodes[$i]->clean($value);
+				return $this->_nodes[$i]->clean($value, $level);
 			}
 		}
 
 		// Something went wrong
-		throw new \Exception('invalid value');
+		throw new NodeException(array(array(implode('.', $level), 'matches no option')));
 	}
 
 	/**
@@ -2505,7 +2591,7 @@ class ParentNode extends _BaseNode implements \ArrayAccess {
 	 * @param array $value				The value to clean
 	 * @return array
 	 */
-	public function clean($value) {
+	public function clean($value, $level=array()) {
 
 		// If the value is null and it's optional, return as is
 		if(is_null($value) && $this->_optional) {
@@ -2514,22 +2600,34 @@ class ParentNode extends _BaseNode implements \ArrayAccess {
 
 		// If the value is not a dict
 		if(!is_array($value)) {
-			throw new \Exception('value');
+			throw new NodeException(array(array(\implode('.', $level), 'not a valid array')));
 		}
 
 		// Init the return value
 		$aRet = array();
 
 		// Go through each value and clean it using the associated node
+		$aErrors = array();
 		foreach($value as $k => $v) {
+
+			// Add the field to the level
+			$aLevel = $level;
+			$aLevel[] = $k;
 
 			// If the key doesn't exist
 			if(!isset($this->_nodes[$k])) {
-				throw new \Exception(strval($k) . ' is not a valid node in the parent');
+				$aErrors[] = array(\implode('.', $aLevel));
 			}
 
-			// Clean the value
-			$aRet[$k] = $this->_nodes[$k]->clean($value[$k]);
+			// Else, clean the value
+			else {
+				$aRet[$k] = $this->_nodes[$k]->clean($value[$k], $aLevel);
+			}
+		}
+
+		// If there's any errors
+		if(count($aErrors)) {
+			throw new NodeException($aErrors);
 		}
 
 		// Return the cleaned values
@@ -2729,15 +2827,15 @@ class ParentNode extends _BaseNode implements \ArrayAccess {
 		foreach($this->_nodes as $k => $n) {
 
 			// Add the field to the level
-			$lLevel = $level;
-			$lLevel[] = $k;
+			$aLevel = $level;
+			$aLevel[] = $k;
 
 			// If we are missing a node
 			if(!isset($value[$k])) {
 
 				// If the value is not optional
 				if(!$n->_optional) {
-					$this->validation_failures[] = array(implode('.', $lLevel), 'missing');
+					$this->validation_failures[] = array(implode('.', $aLevel), 'missing');
 					$bRet = false;
 				}
 
@@ -2746,7 +2844,7 @@ class ParentNode extends _BaseNode implements \ArrayAccess {
 			}
 
 			// If the element isn't valid, return false
-			if(!$n->valid($value[$k], $lLevel)) {
+			if(!$n->valid($value[$k], $aLevel)) {
 				$this->validation_failures = array_merge(
 					$this->validation_failures,
 					$n->validation_failures
@@ -2763,7 +2861,7 @@ class ParentNode extends _BaseNode implements \ArrayAccess {
 
 					// If the field doesn't exist in the value
 					if(!isset($value[$f]) || in_array($value[$f], array('0000-00-00','',null))) {
-						$this->validation_failures[] = array(implode('.', $lLevel), 'requires "' . strval($f) . '" to also be set');
+						$this->validation_failures[] = array(implode('.', $aLevel), 'requires "' . strval($f) . '" to also be set');
 						$bRet = false;
 					}
 				}

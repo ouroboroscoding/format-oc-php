@@ -40,6 +40,107 @@ class FormatTest extends TestCase {
 		$this->assertTrue($a->validation_failures[0][1] == 'failed regex (internal)', 'fail value is not correct: ' . strval($a->validation_failures[0][1]));
 	}
 
+	public function test_Complex() {
+
+		// Create a complex structure with all types of data just to make sure
+		//	everything runs as expected. We don't need to test/verify the data,
+		//	as the other methods will do that. This is more to make sure multi-
+		//	level structures work as expected by calling each other
+		$oComplex = new FormatOC\Tree(array(
+			"__name__" => "Complex",
+			"array" => array(
+				"__array__" => "unique",
+				"__type__" => array(
+					"string" => array("__type__" => "string"),
+					"unsigned" => array("__type__" => "uint"),
+					"date" => array("__type__" => "date")
+				)
+			),
+			"hash" => array(
+				"__hash__" => "uuid",
+				"__type__" => array(
+					"boolean" => array("__type__" => "bool"),
+					"price" => array("__type__" => "price"),
+					"float" => array("__type__" => "float")
+				)
+			),
+			"options" => array(
+				array("__type__" => "date"),
+				array("__type__" => "datetime")
+			),
+			"parent" => array(
+				"any" => array("__type__" => "any"),
+				"base64" => array("__type__" => "base64"),
+				"parent_again" => array(
+					"integer" => array("__type__" => "int"),
+					"md5" => array("__type__" => "md5")
+				)
+			)
+		));
+
+		// Create an instance
+		$aComplex = array(
+			"array" => array(
+				array("string" => "Hello", "unsigned" => 100, "date" => "2022-01-01"),
+				array("string" => "There", "unsigned" => 0, "date" => "1981-05-02"),
+				array("string" => "Friend", "unsigned" => 13, "date" => "1950-04-23")
+			),
+			"hash" => array(
+				"52cd4b20-ca32-4433-9516-0c8684ec57c2" => array(
+					"boolean" => True, "price" => "9.99", "float" => 9.9
+				),
+				"3b44c5ed-0fea-4478-9f1b-939ae6ec0721" => array(
+					"boolean" => False, "price" => "0.99", "float" => 0.999
+				),
+				"6432b16a-7e27-47cd-8360-82d82ac70078" => array(
+					"boolean" => True, "price" => "10.00", "float" => 10.01
+				)
+			),
+			"options" => "2000-12-23",
+			"parent" => array(
+				"any" => null,
+				"base64" => "SGVsbG8sIHRoaXMgaXMgYSB0ZXN0IQ==",
+				"parent_again" => array(
+					"integer" => -10,
+					"md5" => "7b967af699a0a18b1f2bdc9704537a3e"
+				)
+			)
+		);
+
+		// Clean
+		$oComplex->clean($aComplex);
+
+		// Validate
+		$oComplex->valid($aComplex);
+
+		// Create another instance
+		$aComplex = array(
+			"array" => array(
+				array("string" => "Stuff", "unsigned" => 7676, "date" => "3000-06-01")
+			),
+			"hash" => array(
+				"6432b16a-7e27-47cd-8360-82d82ac70078" => array(
+					"boolean" => False, "price" => "0.01", "float" => .000001
+				)
+			),
+			"options" => "2000-12-23 12:23:05",
+			"parent" => array(
+				"any" => null,
+				"base64" => "SGVsbG8sIHRoaXMgaXMgYSB0ZXN0IQ==",
+				"parent_again" => array(
+					"integer" => 0,
+					"md5" => "7b967af699a0a18b1f2bdc9704537a3e"
+				)
+			)
+		);
+
+		// Clean
+		$oComplex->clean($aComplex);
+
+		// Validate
+		$oComplex->valid($aComplex);
+	}
+
 	public function test_Hash_Hash_Valid() {
 
 		// Create a hash of hashes
